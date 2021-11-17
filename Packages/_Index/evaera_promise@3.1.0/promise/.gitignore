@@ -1,0 +1,4 @@
+/luacov.*.out
+node_modules/
+.vscode
+build

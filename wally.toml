@@ -1,0 +1,11 @@
+[package]
+name = "brittonfischer/geometrydash"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+[dependencies]
+Knit = "sleitnick/knit@1.0.9"
+Janitor = "howmanysmall/janitor@1.13.14"
+Promise = "evaera/promise@3.1.0"
+Signal = "sleitnick/signal@1.0.1"
