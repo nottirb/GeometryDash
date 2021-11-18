@@ -1,0 +1,11 @@
+[package]
+name = "brittonfischer/spring"
+description = "Standalone spring module from Quenty/NevermoreEngine."
+version = "0.1.0"
+license = "MIT"
+authors = ["Quenty", "Defaultio", "Unascribed", "Scarious"]
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+exclude = ["test", "test.project.json", "DevPackages"]
+
+[dependencies]

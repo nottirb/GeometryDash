@@ -5,19 +5,19 @@ local Assets = ReplicatedStorage:WaitForChild("Assets")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Signal = require(Packages.Signal)
-local Boxcast = require(Shared.Boxcast)
+local Linecast = require(Shared.Linecast)
 
 local MOVEMENT_DIRECTION = Vector3.new(0,0,1)
 local CHARACTER_BASE = Assets.Character
-local DEFAULT_SPEED = 15
-local DEFAULT_GRAVITY = -9.8*10
+local DEFAULT_SPEED = 10.3761348898*2
+local DEFAULT_GRAVITY = -8.76*DEFAULT_SPEED
 local DEFAULT_JUMP_VELOCITY = math.sqrt(-8*DEFAULT_GRAVITY)
-local DEFAULT_STEP_HEIGHT = 0.25
-local GAME_ACCELERATION = 0.1 -- probably make this external
+local DEFAULT_STEP_HEIGHT = 0.5
+local TERMINAL_VELOCITY = -2.6*DEFAULT_SPEED
 local CHARACTER_HEIGHT = CHARACTER_BASE.PrimaryPart.Size.Y
 local CHARACTER_WIDTH = CHARACTER_BASE.PrimaryPart.Size.Z
 
-local X_VECTOR3 = Vector3.new(1,0,0)
+local Z_VECTOR3 = Vector3.new(0,0,1)
 local Y_VECTOR3 = Vector3.new(0,1,0)
 local XZ_VECTOR3 = Vector3.new(1,0,1)
 local DEFAULT_CFRAME = CFrame.fromMatrix(Vector3.new(), Vector3.new(0,0,1):Cross(Vector3.new(0,1,0)), Vector3.new(0,1,0), Vector3.new(0,0,-1))
@@ -77,8 +77,6 @@ function Character:Destroy()
 end
 
 function Character:Kill(position)
-    print("kill")
-
     if self.Alive then
         self.Alive = false
         self.Died:Fire(position or self.Position)
@@ -91,7 +89,7 @@ end
 -- Casting utility
 function Character:CastForwards(position, castLength)
     local halfWidth = CHARACTER_WIDTH/2
-    local result, length = Boxcast(position, MOVEMENT_DIRECTION*(castLength + halfWidth), Y_VECTOR3, CHARACTER_WIDTH, CHARACTER_HEIGHT, 10, self.RaycastParams)
+    local result, length = Linecast(position, MOVEMENT_DIRECTION*(castLength + halfWidth), Y_VECTOR3, CHARACTER_HEIGHT*0.99, 22, self.RaycastParams)
 
     if result and length then
         return result, length - halfWidth
@@ -100,7 +98,7 @@ end
 
 function Character:CastUp(position, castLength)
     local halfHeight = CHARACTER_HEIGHT/2
-    local result, length = Boxcast(position, Vector3.new(0, -self.GravityDirection*(castLength + halfHeight), 0), X_VECTOR3, CHARACTER_WIDTH, CHARACTER_HEIGHT, 10, self.RaycastParams)
+    local result, length = Linecast(position, Vector3.new(0, -self.GravityDirection*(castLength + halfHeight), 0), Z_VECTOR3, CHARACTER_WIDTH, 22, self.RaycastParams)
 
     if result and length then
         return result, length - halfHeight
@@ -109,7 +107,7 @@ end
 
 function Character:CastDown(position, castLength)
     local halfHeight = CHARACTER_HEIGHT/2
-    local result, length = Boxcast(position, Vector3.new(0, self.GravityDirection*(castLength + CHARACTER_HEIGHT/2), 0), X_VECTOR3, CHARACTER_WIDTH, CHARACTER_HEIGHT, 10, self.RaycastParams)
+    local result, length = Linecast(position, Vector3.new(0, self.GravityDirection*(castLength + CHARACTER_HEIGHT/2), 0), Z_VECTOR3, CHARACTER_WIDTH, 22, self.RaycastParams)
 
     if result and length then
         return result, length - halfHeight
@@ -118,10 +116,31 @@ end
 
 -- General physics
 function Character:IsGrounded(position)
-    return self:CastDown(position or self.Position, 0.05)
+    return self:CastDown(position or self.Position, 0.1)
 end
 
-function Character:ShouldStepUp()
+function Character:ShouldStepUp(position)
+    -- upcast, then forward cast, then downcast
+    -- we need to go back by 0.05 studs because the upcast will otherwise go through the object we're trying to cast onto
+    local upCastPosition = position - MOVEMENT_DIRECTION*0.05
+    local upResult = self:CastUp(upCastPosition, self.StepHeight)
+
+    if not upResult then
+        -- we need to cast forwards from the upCastPosition + <0, stepHeight, 0>, because now we need to go forwards and then cast downwards to get the stepheight
+        local forwardsCastPosition = upCastPosition - Vector3.new(0, self.GravityDirection*self.StepHeight, 0)
+        local forwardsResult = self:CastForwards(forwardsCastPosition, 0.05 + self.StepHeight)
+
+        -- ensure there is a platform we can step onto (with enough space), for slopes this also ensures it is <= 45 degrees
+        if not forwardsResult then
+            local downCastPosition = forwardsCastPosition + MOVEMENT_DIRECTION*(0.05 + self.StepHeight)
+            local downResult, downCastLength = self:CastDown(downCastPosition, self.StepHeight)
+
+            if downResult then
+                return self.StepHeight - downCastLength + 0.01
+            end
+        end
+    end
+
     return false
 end
 
@@ -165,7 +184,7 @@ function Character:UpdatePosition(position, velocity, dt)
             -- if we hit something, check if we can step up, otherwise kill the player
             if forwardResult then
                 -- try to step up
-                local stepHeight = Character:ShouldStepUp()
+                local stepHeight = self:ShouldStepUp(self.Position + MOVEMENT_DIRECTION*forwardLength)
 
                 -- keep going if we can step up
                 if stepHeight then
@@ -196,7 +215,7 @@ function Character:UpdatePosition(position, velocity, dt)
 
             if forwardResult then
                 -- try to step up
-                local stepHeight = Character:ShouldStepUp()
+                local stepHeight = self:ShouldStepUp(self.Position + MOVEMENT_DIRECTION*forwardLength)
 
                 -- keep going if we can step up
                 if stepHeight then
@@ -240,7 +259,7 @@ function Character:UpdatePosition(position, velocity, dt)
 
         if forwardResult then
             -- try to step up
-            local stepHeight = Character:ShouldStepUp()
+            local stepHeight = self:ShouldStepUp(self.Position + MOVEMENT_DIRECTION*forwardLength)
 
             -- keep going if we can step up
             if stepHeight then
@@ -272,9 +291,6 @@ function Character:Step(dt)
         return
     end
 
-    -- adjust player speed based on game acceleration
-    self.Speed = self.Speed + GAME_ACCELERATION*dt
-
     -- get current velocity
     local velocity = self.Velocity
 
@@ -285,7 +301,6 @@ function Character:Step(dt)
 
         -- if we're grounded and jumping, and not moving upwards, then change the velocity to go up
         if self.Grounded and self.Jumping and velocity.Y <= 0 then
-            print("jump")
             velocity = velocity*XZ_VECTOR3 + Vector3.new(0, DEFAULT_JUMP_VELOCITY*self.Speed/DEFAULT_SPEED, 0)
 
         -- otherwise apply gravity
@@ -295,6 +310,10 @@ function Character:Step(dt)
     elseif self.State == Character.Enum.State.Flying then
         print("flying")
     end
+
+    -- account for terminal velocity
+    velocity = velocity*XZ_VECTOR3 + Vector3.new(0, math.max(velocity.Y, TERMINAL_VELOCITY), 0)
+
     -- move the character and update velocity
     local position = self:UpdatePosition(self.Position, velocity, dt)
 

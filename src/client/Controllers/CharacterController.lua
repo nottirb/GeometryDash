@@ -35,6 +35,18 @@ function CharacterController:KnitStart()
                     self.Character:Jump(false)
                 end
             end
+        elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+            --[[local char = self.Character
+
+            if char then
+                char:Step(1/60)
+                char:Step(1/60)
+                char:Step(1/60)
+
+                if char and char.Alive then
+                    workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position + Vector3.new(-10,0,0)
+                end
+            end]]
         end
     end)
 
