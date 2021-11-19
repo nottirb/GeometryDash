@@ -45,7 +45,7 @@ end
    @param width number -- The width of the box to cast
    @param raycastParams RaycastParams -- The raycast parameters
 ]=]
-local function boxcast(origin, direction, upVector, height, width, accuracy, raycastParams, minLength, shouldVisualize)
+local function boxcast(origin, direction, upVector, height, accuracy, raycastParams, minLength, shouldVisualize)
     clearVisualizations()
 
     shouldVisualize = true
@@ -57,12 +57,7 @@ local function boxcast(origin, direction, upVector, height, width, accuracy, ray
     -- store best result and the length of that result for returning and comparison
     local bestResult, smallestLength
 
-    -- calculate right vector
-    local rightVector = direction:Cross(upVector).unit
-
     -- calcuate starting position and step sizes
-    local startPos = origin - 0.5*rightVector*width - 0.5*upVector*height
-    local xStepSize = rightVector*width/accuracy
     local yStepSize = upVector*height/accuracy
 
     -- iterate as a box from startPos -> endPos with (accuracy + 1)^2 raycasts
@@ -91,7 +86,7 @@ local function boxcast(origin, direction, upVector, height, width, accuracy, ray
         end
     end
 
-    if shouldVisualize then
+    --[[if shouldVisualize then
         repeat
             task.wait()
         until game:GetService("UserInputService"):IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
@@ -99,7 +94,7 @@ local function boxcast(origin, direction, upVector, height, width, accuracy, ray
         repeat
             task.wait()
         until not game:GetService("UserInputService"):IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
-    end
+    end]]
 
     -- return best result and its length
     return bestResult, smallestLength

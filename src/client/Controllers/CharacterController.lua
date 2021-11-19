@@ -24,6 +24,14 @@ function CharacterController:KnitStart()
                 if self.Character then
                     self.Character:Jump(true)
                 end
+            elseif input.KeyCode == Enum.KeyCode.E then
+                if self.Character then
+                    self.Character:SwitchGravity()
+                end
+            elseif input.KeyCode == Enum.KeyCode.R then
+                if self.Character then
+                    self.Character:SetState(self.Character.State == CharacterComponent.Enum.State.Default and CharacterComponent.Enum.State.Flying or CharacterComponent.Enum.State.Default)
+                end
             end
         end
     end)
@@ -45,7 +53,7 @@ function CharacterController:KnitStart()
                 char:Step(1/60)
 
                 if char and char.Alive then
-                    workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position*Vector3.new(1,0,1) + Vector3.new(-10,5,0)
+                    workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position*Vector3.new(1,0,1) + Vector3.new(-14,7,0)
                 end
             end]]
         end
@@ -58,7 +66,7 @@ function CharacterController:KnitStart()
             char:Step(dt)
 
             if char and char.Alive then
-                workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position*Vector3.new(1,0,1) + Vector3.new(-10,5,0)
+                workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position*Vector3.new(1,0,1) + Vector3.new(-14,7,0)
             end
         end
     end)
