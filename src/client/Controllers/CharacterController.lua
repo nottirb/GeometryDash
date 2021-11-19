@@ -42,9 +42,10 @@ function CharacterController:KnitStart()
                 char:Step(1/60)
                 char:Step(1/60)
                 char:Step(1/60)
+                char:Step(1/60)
 
                 if char and char.Alive then
-                    workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position + Vector3.new(-10,0,0)
+                    workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position*Vector3.new(1,0,1) + Vector3.new(-10,5,0)
                 end
             end]]
         end
@@ -57,7 +58,7 @@ function CharacterController:KnitStart()
             char:Step(dt)
 
             if char and char.Alive then
-                workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position + Vector3.new(-10,0,0)
+                workspace.CurrentCamera.CFrame = CFrame.Angles(0,-math.pi/2,0) + char.Position*Vector3.new(1,0,1) + Vector3.new(-10,5,0)
             end
         end
     end)

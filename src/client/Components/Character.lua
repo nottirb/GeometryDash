@@ -5,6 +5,7 @@ local Assets = ReplicatedStorage:WaitForChild("Assets")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Signal = require(Packages.Signal)
+local Spring = require(Packages.Spring)
 local Linecast = require(Shared.Linecast)
 
 local MOVEMENT_DIRECTION = Vector3.new(0,0,1)
@@ -16,12 +17,18 @@ local DEFAULT_STEP_HEIGHT = 0.5
 local TERMINAL_VELOCITY = -2.6*DEFAULT_SPEED
 local CHARACTER_HEIGHT = CHARACTER_BASE.PrimaryPart.Size.Y
 local CHARACTER_WIDTH = CHARACTER_BASE.PrimaryPart.Size.Z
+local MAX_SLOPE_ANGLE = math.rad(40)
 
 local Z_VECTOR3 = Vector3.new(0,0,1)
 local Y_VECTOR3 = Vector3.new(0,1,0)
 local XZ_VECTOR3 = Vector3.new(1,0,1)
 local DEFAULT_CFRAME = CFrame.fromMatrix(Vector3.new(), Vector3.new(0,0,1):Cross(Vector3.new(0,1,0)), Vector3.new(0,1,0), Vector3.new(0,0,-1))
 local INVERTED_CFRAME = CFrame.fromMatrix(Vector3.new(), Vector3.new(0,0,1):Cross(Vector3.new(0,-1,0)), Vector3.new(0,-1,0), Vector3.new(0,0,-1))
+
+local timePassed = 0
+local clock = function()
+    return timePassed
+end
 
 --[=[
     @class Character
@@ -57,6 +64,10 @@ function Character.new()
     self.Velocity = Vector3.new(0, 0, DEFAULT_SPEED)
     self.StepHeight = DEFAULT_STEP_HEIGHT
     self.RaycastParams = raycastParams
+
+    self.RotationSpeed = 0
+    self.RotationSpring = Spring.new(0, clock)
+    self.RotationSpring.Speed = 50
 
     self.Died = Signal.new()
     self.Destroyed = Signal.new()
@@ -116,7 +127,7 @@ end
 
 -- General physics
 function Character:IsGrounded(position)
-    return self:CastDown(position or self.Position, 0.1)
+    return self:CastDown(position or self.Position, 0.2)
 end
 
 function Character:ShouldStepUp(position)
@@ -148,16 +159,19 @@ function Character:Jump(enabled)
     self.Jumping = enabled or false
 end
 
-function Character:MoveTo(position)
+function Character:MoveTo(position, groundOffset)
     local currentPosition = self.Position
     local offset = (position - currentPosition).Magnitude
 
     self.Moved:Fire(position, currentPosition, offset)
-    self.Model:SetPrimaryPartCFrame(DEFAULT_CFRAME + position)
+    self.Model:SetPrimaryPartCFrame(DEFAULT_CFRAME*CFrame.Angles(self.RotationSpring.Position, 0, 0) + position + Vector3.new(0, self.GravityDirection*groundOffset, 0))
 end
 
 -- edge case for this is probably if we hit the ground and are jumping, we should switch up the velocity?
 function Character:UpdatePosition(position, velocity, dt)
+    timePassed += dt
+
+    debug.profilebegin("UpdatePosition")
     local xVelocity = (velocity*MOVEMENT_DIRECTION).Magnitude
     local yVelocity = velocity.Y
 
@@ -282,10 +296,14 @@ function Character:UpdatePosition(position, velocity, dt)
         end
     end
 
+    debug.profileend()
+
     return position
 end
 
 function Character:Step(dt)
+    debug.profilebegin("CharacterStep")
+
     -- don't step if the character isn't alive
     if self.Alive ~= true then
         return
@@ -303,9 +321,15 @@ function Character:Step(dt)
         if self.Grounded and self.Jumping and velocity.Y <= 0 then
             velocity = velocity*XZ_VECTOR3 + Vector3.new(0, DEFAULT_JUMP_VELOCITY*self.Speed/DEFAULT_SPEED, 0)
 
-        -- otherwise apply gravity
+        -- otherwise apply gravity, rotate the character if we're not grounded
         else
             velocity += Vector3.new(0, dt*DEFAULT_GRAVITY*self.Speed/DEFAULT_SPEED, 0)
+
+            if not self.Grounded then
+                self.RotationSpring.Target -= 2.4*math.pi*dt
+                self.RotationSpring.Speed = 125
+                --self.RotationSpring.Position = self.RotationSpring.Target
+            end
         end
     elseif self.State == Character.Enum.State.Flying then
         print("flying")
@@ -325,14 +349,54 @@ function Character:Step(dt)
         if isGrounded and groundDistance and velocity.Y < 0 then
             velocity *= XZ_VECTOR3
             position += Vector3.new(0, self.GravityDirection*groundDistance, 0)
+
+            local normal = isGrounded.Normal
+            local surfaceRotation = -math.atan2(normal.Z, normal.Y)
+
+            if math.abs(surfaceRotation) > MAX_SLOPE_ANGLE + 0.01 then
+                self:Kill()
+            else
+                -- set the target rotation to match the surface rotation (if not jumping)
+                --if not self.Jumping then
+                    local currentTargetRotation = self.RotationSpring.Target
+
+                    --[[
+                    if currentTargetRotation < 0 then
+                        currentTargetRotation += 2*math.pi
+                        self.RotationSpring.Position += 2*math.pi
+                        self.RotationSpring.Target = currentTargetRotation
+                    end]]
+                    
+
+                    local rotationRemainder = currentTargetRotation % (math.pi/2)
+                    local nearestRightAngle
+
+                    if surfaceRotation > 0 then
+                        nearestRightAngle = rotationRemainder < math.pi/4 and currentTargetRotation - rotationRemainder or currentTargetRotation - math.pi/2 + rotationRemainder
+                    else
+                        nearestRightAngle = rotationRemainder < math.pi/4 and currentTargetRotation - rotationRemainder or currentTargetRotation + math.pi/2 - rotationRemainder
+                    end
+
+                    self.RotationSpring.Target = nearestRightAngle + surfaceRotation
+
+                    if not self.Jumping then
+                        self.RotationSpring.Speed = 50
+                    end
+                --end
+
+                local groundOffset = math.abs(math.sin(surfaceRotation))
+                self:MoveTo(position, groundOffset)
+            end
+        else
+            self:MoveTo(position, 0)
         end
 
         self.Grounded = isGrounded ~= nil
-        self:MoveTo(position)
         self.Position = position
     end
 
     self.Velocity = velocity
+    debug.profileend()
 end
 
 return Character
