@@ -8,89 +8,163 @@ local Signal = require(Packages.Signal)
 local Spring = require(Packages.Spring)
 local Linecast = require(Shared.Linecast)
 
-local MOVEMENT_DIRECTION = Vector3.new(0,0,1)
+-- constants
 local CHARACTER_BASE = Assets.Character
-local DEFAULT_SPEED = 10.3761348898*2
-local DEFAULT_GRAVITY = -8.76*DEFAULT_SPEED
-local DEFAULT_JUMP_VELOCITY = math.sqrt(-8*DEFAULT_GRAVITY)
-local DEFAULT_STEP_HEIGHT = 0.5
-local DEFAULT_TERMINAL_VELOCITY = -2.6*DEFAULT_SPEED
-local FLYING_GRAVITY = -3*DEFAULT_SPEED
-local FLYING_TERMINAL_VELOCITY = -DEFAULT_SPEED/1.25
 local CHARACTER_HEIGHT = CHARACTER_BASE.PrimaryPart.Size.Y
 local CHARACTER_WIDTH = CHARACTER_BASE.PrimaryPart.Size.Z
+
+local SPEED = 10.3761348898*2
+local MOVEMENT_DIRECTION = Vector3.new(0,0,1)
+local JUMP_VELOCITY = math.sqrt(-8*SPEED)
 local MAX_SLOPE_ANGLE = math.rad(40)
+
+local DEFAULT_GRAVITY = -8.76*SPEED
+local DEFAULT_STEP_HEIGHT = 0.5
+local DEFAULT_TERMINAL_VELOCITY = -2.6*SPEED
+
+local FLYING_GRAVITY = -3*SPEED
+local FLYING_TERMINAL_VELOCITY = -SPEED/1.25
 
 local Z_VECTOR3 = Vector3.new(0,0,1)
 local Y_VECTOR3 = Vector3.new(0,1,0)
 local XZ_VECTOR3 = Vector3.new(1,0,1)
 local DEFAULT_CFRAME = CFrame.fromMatrix(Vector3.new(), Vector3.new(0,0,1):Cross(Vector3.new(0,1,0)), Vector3.new(0,1,0), Vector3.new(0,0,-1))
-local INVERTED_CFRAME = CFrame.fromMatrix(Vector3.new(), Vector3.new(0,0,1):Cross(Vector3.new(0,-1,0)), Vector3.new(0,-1,0), Vector3.new(0,0,-1))
 
 --[=[
     @class Character
+
+    Handles the movement physics and state of the created character model.
 ]=]
 local Character = {}
 Character.__index = Character
 
 -- Enumerations
 Character.Enum = {}
+
+--[=[
+    @interface State
+    @tag enum
+    @within Character
+    
+    .Default 0 -- Default movement state
+    .Flying 1 -- Flying movement state
+
+    Represents the movement state of the character.
+]=]
 Character.Enum.State = {
     Default = 0;
     Flying = 1;
 }
 
+--[=[
+    @function new
+    @within Character
+    @return Character -- generated Character object
+
+    Generates a character model at [0,0,0], and builds a Character object to handle its physics.
+]=]
+
+--[=[
+    @prop Model Model
+    @within Character
+
+    Represents the character model of the Character. Contains the RootPart.
+]=]
+--[=[
+    @prop RootPart BasePart
+    @within Character
+
+    Represents the root part of the character model, all of the physics originates at the position of the root part. The Position of the Character object is the same as the root part's position.
+]=]
+--[=[
+    @prop Speed number
+    @within Character
+
+    The unsigned horizontal velocity of the character (in studs/second). Used as the basis for physics calculations.
+]=]
+--[=[
+    @prop Position Vector3
+    @within Character
+
+    The position of the root part. Origin of all the physics calculations, regardless of state.
+]=]
+--[=[
+    @prop Velocity Vector3
+    @within Character
+
+    The unsigned velocity of the player. What this means is that it does not depend on the direction of gravity, or the movement direction of the player. In effect, it is relative to the actual character model.
+]=]
 function Character.new()
-    local self = setmetatable({}, Character)
-    
+    -- Pre-build
     local characterModel = CHARACTER_BASE:Clone()
     local rootPart = characterModel:WaitForChild("RootPart")
-    characterModel.Parent = workspace
+    characterModel.Parent = workspace -- temp
 
     local raycastParams = RaycastParams.new()
     raycastParams.FilterDescendantsInstances = {characterModel}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 
-    self.Alive = true
-    self.State = Character.Enum.State.Default
+    -- Create Class object
+    local self = setmetatable({}, Character)
+
+    -- Add private properties
+    self._alive = true
+    self._state = Character.Enum.State.Default
+    self._gravityDirection = -1
+    self._stepHeight = DEFAULT_STEP_HEIGHT
+    self._raycastParams = raycastParams
+    self._timePassed = 0
+    self._grounded = false
+    
+    local function clock()
+        return self._timePassed
+    end
+    
+    self._rotationSpring = Spring.new(0, clock)
+    self._rotationSpring.Speed = 50
+
+    -- Add public properties
     self.Model = characterModel
     self.RootPart = rootPart
-    self.Speed = DEFAULT_SPEED
-    self.GravityDirection = -1
+    self.Speed = SPEED
     self.Position = Vector3.new(0, 1, 0)
-    self.Velocity = Vector3.new(0, 0, DEFAULT_SPEED)
-    self.StepHeight = DEFAULT_STEP_HEIGHT
-    self.RaycastParams = raycastParams
+    self.Velocity = Vector3.new(0, 0, SPEED)
 
-    self.TimePassed = 0
-    self.Clock = function()
-        return self.TimePassed
-    end
-
-    self.RotationSpring = Spring.new(0, self.Clock)
-    self.RotationSpring.Speed = 50
-
+    -- Create events
     self.Died = Signal.new()
     self.Destroyed = Signal.new()
     self.Moved = Signal.new()
 
+    -- Set default position
     characterModel:SetPrimaryPartCFrame(DEFAULT_CFRAME + self.Position)
 
+    -- Return new object
     return self
 end
 
+--[=[
+    @within Character
+
+    Destroys the Character object by destroying the character model, cleaning up events, and killing its metatable.
+]=]
 function Character:Destroy()
     self.Model:Destroy()
     self.Died:Destroy()
     self.Moved:Destroy()
     self.Destroyed:Fire()
     self.Destroyed:Destroy()
-    setmetatable(self, nil)
 end
 
+--[=[
+    @within Character
+
+    @param position Vector3? -- The position that the character is killed at
+
+    Kills the Character, eventually calling ``:Destroy()`` on it aswell.
+]=]
 function Character:Kill(position)
-    if self.Alive then
-        self.Alive = false
+    if self._alive then
+        self._alive = false
         self.Died:Fire(position or self.Position)
 
         -- temp
@@ -99,75 +173,100 @@ function Character:Kill(position)
 end
 
 -- Casting utility
-function Character:CastForwards(position, castLength)
+--[=[
+    @within Character
+    @private
+
+    @param position Vector3 -- The position of the character when making the forward linecast.
+    @param castLength number -- The length of the forward cast, keep in mind that this is added to half of the width of the character. Effectively beginning the cast from the character's side.
+
+    @return RaycastResult? -- The result of casting a line of rays forwards
+    @return number? -- The length of the smallest ray in the linecast
+
+    Casts a line of rays forwards in a vertical fashion.
+]=]
+function Character:_castForwards(position, castLength)
     local halfWidth = CHARACTER_WIDTH/2
-    local result, length = Linecast(position, MOVEMENT_DIRECTION*(castLength + halfWidth), Y_VECTOR3, CHARACTER_HEIGHT*0.99, 22, self.RaycastParams)
+    local result, length = Linecast(position, MOVEMENT_DIRECTION*(castLength + halfWidth), Y_VECTOR3, CHARACTER_HEIGHT*0.99, 22, self._raycastParams)
 
     if result and length then
         return result, length - halfWidth
     end
 end
 
-function Character:CastUp(position, castLength)
+--[=[
+    @within Character
+    @private
+
+    @param position Vector3 -- The position of the character when making the forward linecast.
+    @param castLength number -- The length of the upward cast, keep in mind that this is added to half of the height of the character. Effectively beginning the cast from the character's "head."
+
+    @return RaycastResult? -- The result of casting a line of rays forwards
+    @return number? -- The length of the smallest ray in the linecast
+
+    Casts a line of rays up in a horizontal fashion.
+]=]
+function Character:_castUp(position, castLength)
     local halfHeight = CHARACTER_HEIGHT/2
-    local result, length = Linecast(position, Vector3.new(0, -self.GravityDirection*(castLength + halfHeight), 0), Z_VECTOR3, CHARACTER_WIDTH, 22, self.RaycastParams)
+    local result, length = Linecast(position, Vector3.new(0, -self._gravityDirection*(castLength + halfHeight), 0), Z_VECTOR3, CHARACTER_WIDTH, 22, self._raycastParams)
 
     if result and length then
         return result, length - halfHeight
     end
 end
 
-function Character:CastDown(position, castLength)
+--[=[
+    @within Character
+    @private
+
+    @param position Vector3 -- The position of the character when making the forward linecast.
+    @param castLength number -- The length of the downward cast, keep in mind that this is added to half of the height of the character. Effectively beginning the cast from the character's "feet."
+
+    @return RaycastResult? -- The result of casting a line of rays forwards
+    @return number? -- The length of the smallest ray in the linecast
+
+    Casts a line of rays down in a horizontal fashion.
+]=]
+function Character:_castDown(position, castLength)
     local halfHeight = CHARACTER_HEIGHT/2
-    local result, length = Linecast(position, Vector3.new(0, self.GravityDirection*(castLength + CHARACTER_HEIGHT/2), 0), Z_VECTOR3, CHARACTER_WIDTH, 22, self.RaycastParams)
+    local result, length = Linecast(position, Vector3.new(0, self._gravityDirection*(castLength + CHARACTER_HEIGHT/2), 0), Z_VECTOR3, CHARACTER_WIDTH, 22, self._raycastParams)
 
     if result and length then
         return result, length - halfHeight
     end
 end
 
--- General physics
-function Character:SetState(state)
-    self.State = state
+--[=[
+    @within Character
+    @private
 
-    if state == Character.Enum.State.Default then
-        self.RotationSpring.Target = self.RotationSpring.Position
+    @param position Vector3? -- The position of the character, defaults to self.Position
 
-    elseif state == Character.Enum.State.Flying then
-        self.Velocity = self.Velocity*XZ_VECTOR3 + Vector3.new(0, math.clamp(self.Velocity.Y, FLYING_TERMINAL_VELOCITY, -FLYING_TERMINAL_VELOCITY))
-        self.RotationSpring.Target = -math.pi/8*self.Velocity.Y/FLYING_TERMINAL_VELOCITY
-        self.RotationSpring.Position = self.RotationSpring.Target
-    end
-end
+    @return number? -- The height the character can step up, if applicable. If this is not returned (i.e. if it is nil), then the character should not step up.
 
-function Character:IsGrounded(position, velocity)
-    local downResult, downLength = self:CastDown(position or self.Position, 0.2)
+    Checks if the character should step up at a given position.
+]=]
+function Character:_shouldStepUp(position)
+    -- defaults
+    position = position or self.Position
 
-    if downResult and velocity.Y < 0 then
-        return downResult, downLength
-    elseif self.State == Character.Enum.State.Flying and velocity.Y > 0 then
-        return self:CastUp(position or self.Position, 0.2)
-    end
-end
-
-function Character:ShouldStepUp(position)
     -- upcast, then forward cast, then downcast
     -- we need to go back by 0.05 studs because the upcast will otherwise go through the object we're trying to cast onto
     local upCastPosition = position - MOVEMENT_DIRECTION*0.05
-    local upResult = self:CastUp(upCastPosition, self.StepHeight)
+    local upResult = self:_castUp(upCastPosition, self._stepHeight)
 
     if not upResult then
         -- we need to cast forwards from the upCastPosition + <0, stepHeight, 0>, because now we need to go forwards and then cast downwards to get the stepheight
-        local forwardsCastPosition = upCastPosition - Vector3.new(0, self.GravityDirection*self.StepHeight, 0)
-        local forwardsResult = self:CastForwards(forwardsCastPosition, 0.05 + self.StepHeight)
+        local forwardsCastPosition = upCastPosition - Vector3.new(0, self._gravityDirection*self._stepHeight, 0)
+        local forwardsResult = self:_castForwards(forwardsCastPosition, 0.05 + self._stepHeight)
 
         -- ensure there is a platform we can step onto (with enough space), for slopes this also ensures it is <= 45 degrees
         if not forwardsResult then
-            local downCastPosition = forwardsCastPosition + MOVEMENT_DIRECTION*(0.05 + self.StepHeight)
-            local downResult, downCastLength = self:CastDown(downCastPosition, self.StepHeight)
+            local downCastPosition = forwardsCastPosition + MOVEMENT_DIRECTION*(0.05 + self._stepHeight)
+            local downResult, downCastLength = self:_castDown(downCastPosition, self._stepHeight)
 
             if downResult then
-                return self.StepHeight - downCastLength + 0.01
+                return self._stepHeight - downCastLength + 0.01
             end
         end
     end
@@ -175,273 +274,340 @@ function Character:ShouldStepUp(position)
     return false
 end
 
+-- General physics
+--[=[
+    @within Character
+
+    @param state State -- State to set the character to
+
+    Sets the state of the character.
+]=]
+function Character:SetState(state)
+    self._state = state
+
+    if state == Character.Enum.State.Default then
+        self._rotationSpring.Target = self._rotationSpring.Position
+
+    elseif state == Character.Enum.State.Flying then
+        self.Velocity = self.Velocity*XZ_VECTOR3 + Vector3.new(0, math.clamp(self.Velocity.Y, FLYING_TERMINAL_VELOCITY, -FLYING_TERMINAL_VELOCITY))
+        self._rotationSpring.Target = -math.pi/8*self.Velocity.Y/FLYING_TERMINAL_VELOCITY
+        self._rotationSpring.Position = self._rotationSpring.Target
+    end
+end
+
+--[=[
+    @within Character
+    @private
+
+    @param position Vector3? -- The position of the character, defaults to self.Position
+    @param velocity Vector3? -- The velocity of the character, defaults to self.Velocity
+
+    @return RaycastResult? -- The result of the linecast towards the ground
+    @return number -- The length of the linecast towards the ground
+]=]
+function Character:_isGrounded(position, velocity)
+    -- defaults
+    position, velocity = position or self.Position, velocity or self.Velocity
+
+    -- cast downwards
+    local downResult, downLength = self:_castDown(position, 0.2)
+
+    -- return the downward cast if we're going down
+    if downResult and velocity.Y < 0 then
+        return downResult, downLength
+
+    -- otherwise if we're flying and going up, return an upward cast
+    elseif self._state == Character.Enum.State.Flying and velocity.Y > 0 then
+        return self:_castUp(position, 0.2)
+    end
+end
+
+--[=[
+    @within Character
+    
+    @return boolean -- whether or not the character is grounded
+
+    Returns whether or not the character was calculated to be grounded on the most recent physics step. 
+    This should be used by any outside source trying to figure out if the character is grounded as it does not require any additional calculations by the internal physics engine.
+]=]
+function Character:IsGrounded()
+    return self._grounded
+end
+
+--[=[
+    @within Character
+    
+    @return boolean -- whether or not the character is alive
+
+    Returns whether or not the character is alive. In other words, whether or not the physics engine has decide to kill the player or not.
+]=]
+function Character:IsAlive()
+    return self._alive
+end
+
+--[=[
+    @within Character
+
+    Switches the direction of gravity. 
+    The player will keep their velocity relative to the world space, meaning that since the ``Velocity`` property is relative to the character, its Y value will switch.
+]=]
 function Character:SwitchGravity()
-    self.GravityDirection *= -1
+    self._gravityDirection *= -1
     self.Velocity *= Vector3.new(1, -1, 1)
 end
 
+--[=[
+    @within Character
+
+    @param enabled boolean -- whether the character should jump or not
+
+    Tells the internal physics engine whether or not the character should jump when they are grounded.
+]=]
 function Character:Jump(enabled)
     self.Jumping = enabled or false
 end
 
-function Character:MoveTo(position, groundOffset)
-    local currentPosition = self.Position
-    local offset = (position - currentPosition).Magnitude
+--[=[
+    @within Character
+    @private
 
-    self.Moved:Fire(position, currentPosition, offset)
-    self.Model:SetPrimaryPartCFrame(DEFAULT_CFRAME*CFrame.Angles(self.RotationSpring.Position, 0, 0) + position + Vector3.new(0, self.GravityDirection*groundOffset, 0))
+    @param position Vector3 -- The position the character model should be moved to
+    @param groundOffset number -- The offset to shift the character model by so that they can reach the ground.
+
+    Moves the character to a given position, calls the ``.Moved`` event with 
+    ```
+    (
+        Vector3, -- The new position of the character, including the ground offset
+        Vector3 -- The previous position of the character, including the ground offset
+    )
+    ```
+]=]
+function Character:_moveTo(position, groundOffset)
+    -- get the last position of the character
+    local lastPosition = self._lastPosition
+    local newPosition = position + Vector3.new(0, self._gravityDirection*groundOffset, 0)
+
+    -- update the internal last position
+    self._lastPosition = newPosition
+
+    -- fire the .Moved event and set the character model's cframe to match the position and rotation of the character.
+    self.Moved:Fire(newPosition, lastPosition)
+    self.Model:SetPrimaryPartCFrame(DEFAULT_CFRAME*CFrame.Angles(self._rotationSpring.Position, 0, 0) + newPosition)
 end
 
 -- edge case for this is probably if we hit the ground and are jumping, we should switch up the velocity?
-function Character:UpdatePosition(position, velocity, dt)
-    --debug.profilebegin("UpdatePosition")
-    self.TimePassed += dt
 
-    local xVelocity = (velocity*MOVEMENT_DIRECTION).Magnitude
-    local yVelocity = velocity.Y
+--[=[
+    @within Character
+    @private
 
+    @param position Vector3 -- the position of the character
+    @param velocity Vector3 -- the velocity of the character
+    @param dt number -- the time passed since the last internal physics update
+
+    @return Vector3 -- the new calculated position of the character
+
+    The core movement physics updating system for the Character object. 
+    It calculates where the character should now be given a current position, velocity, and an amount of time passed.
+
+    If the character hits something and the physics system determines that the character should die, it will call the ``:Kill()`` function with the current physics position.
+]=]
+function Character:_updatePosition(position, velocity, dt)
+    debug.profilebegin("UpdatePosition")
+
+    -- get various values that are reused
+    local xVelocity, yVelocity = (velocity*MOVEMENT_DIRECTION).Magnitude, velocity.Y
+    local state = self._state
+    local gravityDirection = Vector3.new(0, self._gravityDirection, 0)
+
+    -- check if we can go up if our velocity indicates we're moving up
     if yVelocity > 0 then
-        -- check if we can go up first
-        do
-            local upCastLength = yVelocity*dt
-            local upResult, upResultLength = self:CastUp(position, upCastLength)
+        local upCastLength = yVelocity*dt
+        local upResult, upResultLength = self:_castUp(position, upCastLength)
 
-            -- kill the player if they hit a ceiling
-            if upResult and self.State ~= Character.Enum.State.Flying then
-                self:Kill()
-                return
-            end
-
-            position += -self.GravityDirection*Vector3.new(0, upResult and upResultLength or upCastLength, 0)
+        -- kill the player if they hit a ceiling
+        if upResult and state == Character.Enum.State.Flying then
+            self:Kill(position)
+            return
         end
 
-        -- now check if we can go forwards
-        do
-            local forwardCastLength = xVelocity*dt
-            local forwardResult, forwardLength = self:CastForwards(position, forwardCastLength)
+        position += -gravityDirection*(upResult and upResultLength or upCastLength)
+    end
 
-            -- if we hit something, check if we can step up, otherwise kill the player
-            if forwardResult then
-                -- try to step up
-                local stepHeight = self.State == Character.Enum.State.Default and self:ShouldStepUp(position + MOVEMENT_DIRECTION*forwardLength)
-
-                -- keep going if we can step up
-                if stepHeight then
-                    -- get the amount of time actually spent moving
-                    local newdt = dt - dt*(forwardLength/forwardCastLength)
-
-                    -- move forwards by forwardsLength, add the stepHeight to our position, then re-cast to move the full distance
-                    position += MOVEMENT_DIRECTION*forwardLength - Vector3.new(0, self.GravityDirection*stepHeight, 0)
-                    position = self:UpdatePosition(position, velocity*XZ_VECTOR3, newdt)
-
-                -- otherwise kill the player, they hit a wall larger than the step height
-                else
-                    self:Kill()
-                    return
-                end
-                
-            else
-                -- move forwards by forwardCastLength
-                position += MOVEMENT_DIRECTION*forwardCastLength
-            end
-        end
-
-    elseif yVelocity <= 0 then
-        -- check if we can go forwards first
-        do
-            local forwardCastLength = xVelocity*dt
-            local forwardResult, forwardLength = self:CastForwards(position, forwardCastLength)
-
-            if forwardResult then
-                -- try to step up
-                local stepHeight = self.State == Character.Enum.State.Default and self:ShouldStepUp(position + MOVEMENT_DIRECTION*forwardLength)
-
-                -- keep going if we can step up
-                if stepHeight then
-                    -- get the amount of time actually spent moving, and adjust that amount for the rest of the casts
-                    local dtSpent = dt*(forwardLength/forwardCastLength)
-                    local newdt = dt - dtSpent
-                    dt = dtSpent
-
-                    -- move forwards by forwardsLength, add the stepHeight to our position, then re-cast to move the full distance
-                    position += MOVEMENT_DIRECTION*forwardLength - Vector3.new(0, self.GravityDirection*stepHeight, 0)
-                    position = self:UpdatePosition(position, velocity*XZ_VECTOR3, newdt)
-
-                -- otherwise kill the player, they hit a wall larger than the step height
-                else
-                    self:Kill()
-                    return
-                end
-                
-            else
-                -- move forwards by forwardCastLength
-                position += MOVEMENT_DIRECTION*forwardCastLength
-            end
-        end
-
-        -- go down as far as possible
-        do
-            local downCastLength = -yVelocity*dt
-            local downResult, downLength = self:CastDown(position, downCastLength)
-
-            -- move down by the length of the downwards cast if it exists, otherwise move down the full distance
-            if downResult and downLength then
-                position += self.GravityDirection*Vector3.new(0, downLength, 0)
-            else
-                position += self.GravityDirection*Vector3.new(0, downCastLength, 0)
-            end
-        end
-
-    else
+    -- move forwards as far as possible
+    do
         local forwardCastLength = xVelocity*dt
-        local forwardResult, forwardLength = self:CastForwards(position, forwardCastLength)
+        local forwardResult, forwardLength = self:_castForwards(position, forwardCastLength)
 
         if forwardResult then
             -- try to step up
-            local stepHeight = self.State == Character.Enum.State.Default and self:ShouldStepUp(position + MOVEMENT_DIRECTION*forwardLength)
+            local stepHeight = state == Character.Enum.State.Default and self:_shouldStepUp(position + MOVEMENT_DIRECTION*forwardLength)
 
             -- keep going if we can step up
             if stepHeight then
-                -- get the amount of time actually spent moving
-                local newdt = dt - dt*(forwardLength/forwardCastLength)
+                -- get the amount of time actually spent moving, and adjust that amount for the rest of the casts
+                local dtSpent = dt*(forwardLength/forwardCastLength)
+                local newdt = dt - dtSpent
+                dt = dtSpent
 
                 -- move forwards by forwardsLength, add the stepHeight to our position, then re-cast to move the full distance
-                position += MOVEMENT_DIRECTION*forwardLength + Vector3.new(0, stepHeight, 0)
-                position = self:UpdatePosition(position, velocity, newdt)
+                position += MOVEMENT_DIRECTION*forwardLength - gravityDirection*stepHeight
+                position = self:_updatePosition(position, velocity*XZ_VECTOR3, newdt)
 
             -- otherwise kill the player, they hit a wall larger than the step height
             else
-                self:Kill()
+                self:Kill(position)
                 return
             end
-                
+            
         else
             -- move forwards by forwardCastLength
             position += MOVEMENT_DIRECTION*forwardCastLength
         end
     end
 
-    --debug.profileend()
+    -- move down as far as possible if our velocity indicates we are moving down
+    if yVelocity < 0 then
+        local downCastLength = -yVelocity*dt
+        local downResult, downLength = self:_castDown(position, downCastLength)
 
+        -- move down by the length of the downwards cast if it exists, otherwise move down the full distance
+        if downResult and downLength then
+            position += gravityDirection*downLength
+        else
+            position += gravityDirection*downCastLength
+        end
+    end
+
+
+    -- return our position
+    debug.profileend()
     return position
 end
 
+--[=[
+    @within Character
+
+    @param dt number -- The amount of time passed since the last physics step. This is not automatically calculated for debugging and other reasons.
+
+    Updates the internal clock, and handles the core physics calculations of the Character object. 
+    Moves the character model, determines whether or not the character is grounded, and rotates the model accordingly.
+]=]
 function Character:Step(dt)
-    --debug.profilebegin("CharacterStep")
+    debug.profilebegin("CharacterStep")
+
+    -- update the time passed for the internal clock
+    self._timePassed += dt
 
     -- don't step if the character isn't alive
-    if self.Alive ~= true then
+    if self._alive ~= true then
         return
     end
 
-    -- get current velocity
-    local velocity = self.Velocity
+    -- get various values that are reused
+    local velocity, speed = self.Velocity, self.Speed
+    local jumping = self.Jumping
 
-    -- update velocity based on state
-    if self.State == Character.Enum.State.Default then
+    -- calculate the velocity based on the current state of the character
+    if self._state == Character.Enum.State.Default then
         -- move forwards
-        velocity = velocity*Y_VECTOR3 + MOVEMENT_DIRECTION*self.Speed
+        velocity = velocity*Y_VECTOR3 + MOVEMENT_DIRECTION*speed
 
         -- if we're grounded and jumping, and not moving upwards, then change the velocity to go up
-        if self.Grounded and self.Jumping and velocity.Y <= 0 then
-            velocity = velocity*XZ_VECTOR3 + Vector3.new(0, DEFAULT_JUMP_VELOCITY*self.Speed/DEFAULT_SPEED, 0)
+        if self:IsGrounded() and jumping and velocity.Y <= 0 then
+            velocity = velocity*XZ_VECTOR3 + Vector3.new(0, JUMP_VELOCITY*speed/SPEED, 0)
 
         -- otherwise apply gravity, rotate the character if we're not grounded
         else
-            velocity += Vector3.new(0, dt*DEFAULT_GRAVITY*self.Speed/DEFAULT_SPEED, 0)
+            velocity += Vector3.new(0, dt*DEFAULT_GRAVITY*speed/SPEED, 0)
 
-            if not self.Grounded then
-                self.RotationSpring.Target += self.GravityDirection*2.4*math.pi*dt
-                self.RotationSpring.Speed = 125
-                --self.RotationSpring.Position = self.RotationSpring.Target
+            if not self:IsGrounded() then
+                self._rotationSpring.Target += self._gravityDirection*2.4*math.pi*dt
+                self._rotationSpring.Speed = 125
             end
         end
 
         -- account for terminal velocity
         velocity = velocity*XZ_VECTOR3 + Vector3.new(0, math.max(velocity.Y, DEFAULT_TERMINAL_VELOCITY), 0)
 
-    elseif self.State == Character.Enum.State.Flying then
+    elseif self._state == Character.Enum.State.Flying then
         -- move forwards
-        velocity = velocity*Y_VECTOR3 + MOVEMENT_DIRECTION*self.Speed
+        velocity = velocity*Y_VECTOR3 + MOVEMENT_DIRECTION*speed
 
         -- if we're jumping then accelerate upwards, otherwise accelerate downwards
-        velocity += Vector3.new(0, (self.Jumping and -1 or 1)*dt*FLYING_GRAVITY*self.Speed/DEFAULT_SPEED, 0)
+        velocity += Vector3.new(0, (self.Jumping and -1 or 1)*dt*FLYING_GRAVITY*speed/SPEED, 0)
+
+        -- account for terminal velocity
         velocity = velocity*XZ_VECTOR3 + Vector3.new(0, math.clamp(velocity.Y, FLYING_TERMINAL_VELOCITY, -FLYING_TERMINAL_VELOCITY), 0)
     end
 
-    -- move the character and update velocity
-    local position = self:UpdatePosition(self.Position, velocity, dt)
+    -- move the character
+    local position = self:_updatePosition(self.Position, velocity, dt)
 
-    if position and self.Alive then
+    if position and self:IsAlive() then
         -- check if the character is grounded
-        local isGrounded, groundDistance = self:IsGrounded(position, velocity)
+        local groundResult, groundDistance = self:_isGrounded(position, velocity)
 
         -- if we're moving downwards, but also grounded, then cancel out the downwards velocity and move the character to the ground
-        if isGrounded and groundDistance then
-            position += Vector3.new(0, -math.sign(velocity.Y)*self.GravityDirection*groundDistance, 0)
+        if groundResult and groundDistance then
+            position += Vector3.new(0, -math.sign(velocity.Y)*self._gravityDirection*groundDistance, 0)
             velocity *= XZ_VECTOR3
 
-            -- match the rotation of the ground in the default state
-            if self.State == Character.Enum.State.Default then
-                local normal = isGrounded.Normal
-                local surfaceRotation = self.GravityDirection*math.atan2(normal.Z, -self.GravityDirection*normal.Y)
+            -- in the default state, have the character match the rotation of the ground
+            if self._state == Character.Enum.State.Default then
+                -- get the normal and rotation of the surface the character is standing on
+                local normal = groundResult.Normal
+                local surfaceRotation = self._gravityDirection*math.atan2(normal.Z, -self._gravityDirection*normal.Y)
 
+                -- if the surface rotation is greater than the max slope angle, kill the character
                 if math.abs(surfaceRotation) > MAX_SLOPE_ANGLE + 0.01 then
                     self:Kill()
+                    
+                -- otherwise, set the target rotation to match the surface rotation
                 else
-                    -- set the target rotation to match the surface rotation (if not jumping)
-                    --if not self.Jumping then
-                        local currentTargetRotation = self.RotationSpring.Target
+                    local currentTargetRotation = self._rotationSpring.Target
+                    local rotationRemainder = currentTargetRotation % (math.pi/2)
+                    local nearestRightAngle
 
-                        --[[
-                        if currentTargetRotation < 0 then
-                            currentTargetRotation += 2*math.pi
-                            self.RotationSpring.Position += 2*math.pi
-                            self.RotationSpring.Target = currentTargetRotation
-                        end]]
-                        
+                    if surfaceRotation > 0 then
+                        nearestRightAngle = rotationRemainder < math.pi/4 and currentTargetRotation - rotationRemainder or currentTargetRotation - math.pi/2 + rotationRemainder
+                    else
+                        nearestRightAngle = rotationRemainder < math.pi/4 and currentTargetRotation - rotationRemainder or currentTargetRotation + math.pi/2 - rotationRemainder
+                    end
 
-                        local rotationRemainder = currentTargetRotation % (math.pi/2)
-                        local nearestRightAngle
+                    self._rotationSpring.Target = nearestRightAngle + surfaceRotation
 
-                        if surfaceRotation > 0 then
-                            nearestRightAngle = rotationRemainder < math.pi/4 and currentTargetRotation - rotationRemainder or currentTargetRotation - math.pi/2 + rotationRemainder
-                        else
-                            nearestRightAngle = rotationRemainder < math.pi/4 and currentTargetRotation - rotationRemainder or currentTargetRotation + math.pi/2 - rotationRemainder
-                        end
-
-                        self.RotationSpring.Target = nearestRightAngle + surfaceRotation
-
-                        if not self.Jumping then
-                            self.RotationSpring.Speed = 50
-                        end
-                    --end
+                    if not self.Jumping then
+                        self._rotationSpring.Speed = 50
+                    end
 
                     local groundOffset = math.abs(math.sin(surfaceRotation))
-                    self:MoveTo(position, groundOffset)
+                    self:_moveTo(position, groundOffset)
                 end
+
+            -- otherwise just move the character to the new position
             else
-                self:MoveTo(position, 0)
+                self:_moveTo(position, 0)
             end
+
+        -- otherwise just move the character to the new position
         else
-            self:MoveTo(position, 0)
+            self:_moveTo(position, 0)
         end
         
-        if self.State == Character.Enum.State.Flying then
-            self.RotationSpring.Target = -math.pi/8*velocity.Y/FLYING_TERMINAL_VELOCITY
+        -- if we're flying then calculate the rotation based on the vertical velocity of the character.
+        if self._state == Character.Enum.State.Flying then
+            self._rotationSpring.Target = -math.pi/8*velocity.Y/FLYING_TERMINAL_VELOCITY
         end  
 
-        self.Grounded = isGrounded ~= nil
+        -- update internal and external variables
+        self._grounded = groundResult ~= nil
         self.Position = position
+        self.Velocity = velocity
     end
 
-    if self._gravitySwitched then
-        self._gravitySwitched = false
-        self:SwitchGravity()
-    end
-
-    self.Velocity = velocity
-    --debug.profileend()
+    debug.profileend()
 end
 
+-- return the Character component
 return Character

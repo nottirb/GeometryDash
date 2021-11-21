@@ -34,17 +34,6 @@ local function visualizeRay(start, finish, length)
     visualized[#visualized+1] = rayPart
 end
 
-
---[=[
-   Boxcasts from an origin in a given direction. Returns the closest object hit, if present. 
-
-   @param origin Vector3 -- The origin of the boxcast
-   @param direction Vector3 -- The direction of the boxcast
-   @param upVector Vector3 -- The up vector of the boxcast
-   @param height number -- The height of the box to cast
-   @param width number -- The width of the box to cast
-   @param raycastParams RaycastParams -- The raycast parameters
-]=]
 local function boxcast(origin, direction, upVector, height, accuracy, raycastParams, minLength, shouldVisualize)
     clearVisualizations()
 

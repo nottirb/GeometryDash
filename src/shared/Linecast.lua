@@ -1,14 +1,26 @@
 --[=[
-   Linecasts from an origin in a given direction. Returns the closest object hit, if present. 
+    @class SharedModules
 
-   @param origin Vector3 -- The origin of the boxcast
-   @param direction Vector3 -- The direction of the boxcast
-   @param upVector Vector3 -- The up vector of the boxcast
-   @param height number -- The height of the box to cast
-   @param width number -- The width of the box to cast
-   @param raycastParams RaycastParams -- The raycast parameters
+    Contains all shared modules located in ``ReplicatedStorage/Shared``.
 ]=]
-local function linecast(origin, direction, upVector, height, accuracy, raycastParams, minLength, shouldVisualize)
+
+--[=[
+    Linecasts from an origin in a given direction. Returns the closest object hit, if present. 
+
+    @function Linecast
+    @within SharedModules
+
+    @param origin Vector3 -- The origin of the boxcast
+    @param direction Vector3 -- The direction of the boxcast
+    @param upVector Vector3 -- The up vector of the boxcast
+    @param height number -- The height of the box to cast
+    @param raycastParams RaycastParams -- The raycast parameters
+    @param minLength number -- the minimum length of any returned cast, defaults to 0
+
+    @return RaycastResult -- The result of the linecast
+    @return number -- The final length of the linecast
+]=]
+local function Linecast(origin, direction, upVector, height, accuracy, raycastParams, minLength)
     -- store best result and the length of that result for returning and comparison
     local bestResult, smallestLength
 
@@ -37,4 +49,4 @@ local function linecast(origin, direction, upVector, height, accuracy, raycastPa
 end
 
 -- return boxcast function
-return linecast
+return Linecast
