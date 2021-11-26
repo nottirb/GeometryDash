@@ -15,10 +15,10 @@ local CHARACTER_WIDTH = CHARACTER_BASE.PrimaryPart.Size.Z
 
 local SPEED = 10.3761348898*2
 local MOVEMENT_DIRECTION = Vector3.new(0,0,1)
-local JUMP_VELOCITY = math.sqrt(-8*SPEED)
 local MAX_SLOPE_ANGLE = math.rad(40)
 
 local DEFAULT_GRAVITY = -8.76*SPEED
+local DEFUALT_JUMP_VELOCITY = math.sqrt(-8*DEFAULT_GRAVITY)
 local DEFAULT_STEP_HEIGHT = 0.5
 local DEFAULT_TERMINAL_VELOCITY = -2.6*SPEED
 
@@ -93,6 +93,40 @@ Character.Enum.State = {
     @within Character
 
     The unsigned velocity of the player. What this means is that it does not depend on the direction of gravity, or the movement direction of the player. In effect, it is relative to the actual character model.
+]=]
+--[=[
+    @prop Died GoodSignal
+    @within Character
+    @tag events
+
+    Event that fires when the character dies.
+
+    Called with:
+    ```
+    position: Vector3 -- The true position of the character model at the moment it dies
+    ```
+]=]
+--[=[
+    @prop Moved GoodSignal
+    @within Character
+    @tag events
+
+    Event that fires when the character moves. Takes into account the player ground offset, and fires with the fake model position rather than the true player position,
+    since the true player position is only necessary for physics calculations.
+
+    Called with:
+    ```
+    newPosition: Vector3 -- The new position of the character model
+    oldPosition: Vector3 -- The old position of the character model
+    characterOffset: number -- The offset of the character to reach the ground (in world space)
+    ```
+]=]
+--[=[
+    @prop Destroyed GoodSignal
+    @within Character
+    @tag events
+
+    Event that fires when the character is destroyed. Is not called with anything.
 ]=]
 function Character.new()
     -- Pre-build
@@ -391,7 +425,7 @@ function Character:_moveTo(position, groundOffset)
     self._lastPosition = newPosition
 
     -- fire the .Moved event and set the character model's cframe to match the position and rotation of the character.
-    self.Moved:Fire(newPosition, lastPosition)
+    self.Moved:Fire(newPosition, lastPosition, self._gravityDirection*groundOffset)
     self.Model:SetPrimaryPartCFrame(DEFAULT_CFRAME*CFrame.Angles(self._rotationSpring.Position, 0, 0) + newPosition)
 end
 
@@ -426,7 +460,7 @@ function Character:_updatePosition(position, velocity, dt)
         local upResult, upResultLength = self:_castUp(position, upCastLength)
 
         -- kill the player if they hit a ceiling
-        if upResult and state == Character.Enum.State.Flying then
+        if upResult and state ~= Character.Enum.State.Flying then
             self:Kill(position)
             return
         end
@@ -515,7 +549,7 @@ function Character:Step(dt)
 
         -- if we're grounded and jumping, and not moving upwards, then change the velocity to go up
         if self:IsGrounded() and jumping and velocity.Y <= 0 then
-            velocity = velocity*XZ_VECTOR3 + Vector3.new(0, JUMP_VELOCITY*speed/SPEED, 0)
+            velocity = velocity*XZ_VECTOR3 + Vector3.new(0, DEFUALT_JUMP_VELOCITY*speed/SPEED, 0)
 
         -- otherwise apply gravity, rotate the character if we're not grounded
         else

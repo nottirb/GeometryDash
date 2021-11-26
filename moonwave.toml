@@ -1,6 +1,9 @@
 gitSourceBranch = "master"
 changelog = false
 classOrder = []
+apiCategories = [
+    "events"
+]
 
 [docusaurus]
 onBrokenLinks = "throw"
@@ -10,3 +13,4 @@ url = "https://www.brittonfischer.com"
 
 [footer]
 style = "dark"
+copyright = "Copyright © 2021 Britton Fischer. Built with Moonwave and Docusaurus"
