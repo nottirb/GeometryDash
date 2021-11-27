@@ -1,0 +1,363 @@
+-- imports
+local Selection = game:GetService("Selection")
+local Rodux = require(script.Parent.Packages.Rodux)
+local UIBuilder = require(script.Parent.UIBuilder)
+
+local ACTION_MENU_COLOR = Color3.fromRGB(62,79,104)
+local TITLE = "Compile Map"
+local DESCRIPTION = "Compiles a map to be usable with the GD gameplay engine."
+local ICON = "http://www.roblox.com/asset/?id=7225939800"
+
+-- toolbar
+local Toolbar = plugin:CreateToolbar("GD Utility")
+
+-- gui/functionality
+do
+	-- toolbar
+	local buildToolbarButton = Toolbar:CreateButton(TITLE, DESCRIPTION, ICON)
+	
+	-- gui/functionality
+	local widgetInfo = DockWidgetPluginGuiInfo.new(
+		Enum.InitialDockState.Left,
+		false,
+		false,
+		250,
+		340
+	)
+	
+	-- create main gui
+	local buildWidget = plugin:CreateDockWidgetPluginGui(TITLE, widgetInfo)
+	buildWidget.Title = TITLE
+	
+	local builder = UIBuilder.new()
+	builder:SetParent(buildWidget)
+	builder:SetTitle(TITLE)
+	
+	-- create custom/plugin-specific UI
+	local nameText = builder:CreateTextBox("Map name")
+
+	local collidableButton = builder:CreateButton("Set collidable blocks", ACTION_MENU_COLOR)
+	local collidableLabel = builder:CreateLabel("Unselected")
+
+	local uncollidableButton = builder:CreateButton("Set uncollidable blocks", ACTION_MENU_COLOR)
+	local uncollidableLabel = builder:CreateLabel("Unselected")
+
+	local staticButton = builder:CreateButton("Set static blocks", ACTION_MENU_COLOR)
+	local staticLabel = builder:CreateLabel("Unselected")
+
+	local actionButton = builder:CreateButton("Set action blocks", ACTION_MENU_COLOR)
+	local actionLabel = builder:CreateLabel("Unselected")
+
+	local startButton = builder:CreateButton("Set start location", ACTION_MENU_COLOR)
+	local startLabel = builder:CreateLabel("Unselected")
+	
+	builder:AddSpace(20)
+	
+	local buildButton = builder:CreateButton("Compile Map")
+	
+	-- utility methods
+	local function getSelectionInfo(selection)
+		local newText = ""
+		
+		if #selection == 1 then
+			newText = selection[1]:GetFullName():gsub("%.", "\\")
+		else
+			newText = #selection .. " objects selected"
+		end
+		
+		return newText
+	end
+	
+	-- handle plugin state
+	-- reducers
+	local enabledReducer = function(state, action)
+		state = state or false
+
+		if action.type == "switchEnable" then
+			return not state
+		end
+
+		return state
+	end
+
+	local setReducer = function(state, action)
+		state = state or {
+			collidables = {};
+			uncollidables = {};
+			statics = {};
+			actions = {};
+			start = false;
+		}
+
+		local newState = {}
+		for index, value in next, state do
+			newState[index] = value
+		end
+
+		local actionType = action.type
+
+		if actionType:len() > 4 then
+			local target = actionType:sub(5, actionType:len())
+
+			if state[target] ~= nil then
+				newState[target] = action.payload
+			end
+		end
+
+		return newState
+	end
+
+	local mainReducer = Rodux.combineReducers{
+		enabled = enabledReducer;
+		sets = setReducer;
+	}
+
+	-- store
+	local store = Rodux.Store.new(mainReducer)
+
+	store.changed:connect(function(newState, oldState)
+		-- update User Interface
+		if #newState.sets.collidables > 0 then
+			collidableLabel.Text = getSelectionInfo(newState.sets.collidables)
+		else
+			collidableLabel.Text = "Unselected"
+		end
+		
+		if #newState.sets.uncollidables > 0 then
+			uncollidableLabel.Text = getSelectionInfo(newState.sets.uncollidables)
+		else
+			uncollidableLabel.Text = "Unselected"
+		end
+		
+		if #newState.sets.statics > 0 then
+			staticLabel.Text = getSelectionInfo(newState.sets.statics)
+		else
+			staticLabel.Text = "Unselected"
+		end
+		
+		if #newState.sets.actions > 0 then
+			actionLabel.Text = getSelectionInfo(newState.sets.actions)
+		else
+			actionLabel.Text = "Unselected"
+		end
+		
+		if newState.sets.start ~= false then
+			startLabel.Text = getSelectionInfo({newState.sets.start})
+		else
+			startLabel.Text = "Unselected"
+		end
+		
+		-- update top level UI visibility
+		if newState.enabled ~= oldState.enabled then
+			buildWidget.Enabled = newState.enabled
+		end
+	end)
+	
+	-- top level gui opening/closing
+	buildToolbarButton.Click:Connect(function()
+		store:dispatch{
+			type = "switchEnable"
+		}
+	end)
+	
+	-- selection handling
+	local function dispatchSelection(actionName)
+		store:dispatch{
+			type = "set_" .. actionName;
+			payload = Selection:Get();
+		}
+	end
+
+	collidableButton.MouseButton1Click:Connect(function()
+		dispatchSelection("collidables")
+	end)
+	
+	uncollidableButton.MouseButton1Click:Connect(function()
+		dispatchSelection("uncollidables")
+	end)
+	
+	staticButton.MouseButton1Click:Connect(function()
+		dispatchSelection("statics")
+	end)
+	
+	actionButton.MouseButton1Click:Connect(function()
+		dispatchSelection("actions")
+	end)
+	
+	startButton.MouseButton1Click:Connect(function()
+		local selection = Selection:Get()
+		
+		if #selection == 1 then
+			store:dispatch{
+				type = "set_start";
+				payload = selection[1];
+			}
+			
+		elseif #selection < 1 then
+			store:dispatch{
+				type = "set_start";
+				payload = false;
+			}
+			
+		else
+			warn("GD Map Compiler: You cannot select more than one starting point")
+		end
+	end)
+	
+	-- compiling
+	buildButton.MouseButton1Click:Connect(function()
+		-- get state
+		local state = store:getState()
+		assert(state.sets.start ~= false, "You must select a starting point")
+		
+		-- create map folder
+		local mapFolder = Instance.new("Folder")
+		mapFolder.Parent = game:GetService("ReplicatedStorage") -- TEMP
+		mapFolder.Name = nameText.Text
+		
+		local staticFolder = Instance.new("Folder")
+		staticFolder.Parent = mapFolder
+		staticFolder.Name = "Statics"
+
+		local chunkFolder = Instance.new("Folder")
+		chunkFolder.Parent = mapFolder
+		chunkFolder.Name = "Chunks"
+		
+		for _, item in ipairs(state.sets.statics) do
+			item:Clone().Parent = staticFolder
+		end
+		
+		-- build chunks
+		local startPos = state.sets.start.Position
+		local smallestZPosition = startPos.Z
+		
+		-- fix for bad users
+		for _, item in ipairs(state.sets.collidables) do
+			if item.Position.Z < smallestZPosition then
+				smallestZPosition = item.Position.Z
+			end
+		end
+
+		for _, item in ipairs(state.sets.uncollidables) do
+			if item.Position.Z < smallestZPosition then
+				smallestZPosition = item.Position.Z
+			end
+		end
+
+		for _, item in ipairs(state.sets.actions) do
+			if item.Position.Z < smallestZPosition then
+				smallestZPosition = item.Position.Z
+			end
+		end
+		
+		-- chunks
+		local chunks = {}
+		local zOffset = -smallestZPosition
+		
+		local function getChunk(position)
+			local zPosition = position.Z + zOffset
+			local chunkPosition = (zPosition - zPosition%2)/2 + 1
+			local chunk = chunks[chunkPosition]
+			
+			if not chunk then
+				local chunkInstance = Instance.new("Folder")
+				local collidablesInstance = Instance.new("Folder")
+				local uncollidablesInstance = Instance.new("Folder")
+				local actionInstance = Instance.new("Folder")
+
+				chunkInstance.Parent = chunkFolder
+				collidablesInstance.Parent = chunkInstance
+				uncollidablesInstance.Parent = chunkInstance
+				actionInstance.Parent = chunkInstance
+				
+				chunkInstance.Name = tostring(chunkPosition)
+				collidablesInstance.Name = "Collidables"
+				uncollidablesInstance.Name = "Uncollidables"
+				actionInstance.Name = "Actions"
+				
+				chunk = {
+					Instance = chunkInstance;
+					Collidables = collidablesInstance;
+					Uncollidables = uncollidablesInstance;
+					Actions = actionInstance;
+				}
+				
+				chunks[chunkPosition] = chunk
+			end
+			
+			return chunk
+		end
+		
+		for _, part in ipairs(state.sets.collidables) do
+			local chunk = getChunk(part.Position)
+			local newPart = part:Clone()
+			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
+			newPart.Parent = chunk.Collidables
+		end
+
+		for _, part in ipairs(state.sets.uncollidables) do
+			local chunk = getChunk(part.Position)
+			local newPart = part:Clone()
+			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
+			newPart.Parent = chunk.Uncollidables
+		end
+
+		for _, part in ipairs(state.sets.actions) do
+			local chunk = getChunk(part.Position)
+			local newPart = part:Clone()
+			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
+			newPart.Parent = chunk.Actions
+		end
+		
+		-- build settings module script
+		local _settings = Instance.new("ModuleScript")
+		local source = ([[-- Settings for %s
+local Settings = {}
+
+-- static information
+Settings.Name = "%s"
+
+Settings.StartPosition = Vector3.new(%s, %s, %s)
+
+Settings.AnimationZones = {
+	-- example start:
+	[1] = {
+		Insert = function(part, endPosition)
+			-- animate the part into existence here
+		end;
+		Delete = function(part, startPosition)
+			-- animate the part out of existence here
+		end;
+		ZoneReached = function(character, mapFolder)
+			-- called once whenever you reach this zone
+		end,
+	};
+	
+	-- example continuation:
+	[20] = {
+		-- keeps the same insert animation zone from the previous one ([1])
+		Delete = function(part, startPosition)
+			-- animate the part out of existence here
+		end;
+	};
+
+	[30] = {
+		Insert = function(part, endPosition)
+			-- animate the part into existence here
+		end;
+		-- keeps the same delete animation zone from the previous one ([20])
+	};
+}
+
+return Settings]]
+		):format(nameText.Text, nameText.Text,
+			startPos.X, startPos.Y, startPos.Z + zOffset
+		)
+		
+		_settings.Name = "Settings"
+		_settings.Source = source
+		_settings.Parent = mapFolder
+
+		mapFolder.Parent = game:GetService("ReplicatedStorage")
+	end)
+end

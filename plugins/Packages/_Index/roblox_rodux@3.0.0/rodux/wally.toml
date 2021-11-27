@@ -1,0 +1,8 @@
+[package]
+name = "roblox/rodux"
+version = "3.0.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+[dependencies]
+

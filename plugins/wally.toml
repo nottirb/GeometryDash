@@ -1,0 +1,8 @@
+[package]
+name = "brittonfischer/gd-plugins"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+
+[dependencies]
+Rodux = "roblox/rodux@3.0.0"
