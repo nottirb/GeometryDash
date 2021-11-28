@@ -36,11 +36,8 @@ do
 	-- create custom/plugin-specific UI
 	local nameText = builder:CreateTextBox("Map name")
 
-	local collidableButton = builder:CreateButton("Set collidable blocks", ACTION_MENU_COLOR)
-	local collidableLabel = builder:CreateLabel("Unselected")
-
-	local uncollidableButton = builder:CreateButton("Set uncollidable blocks", ACTION_MENU_COLOR)
-	local uncollidableLabel = builder:CreateLabel("Unselected")
+	local blocksButton = builder:CreateButton("Set blocks", ACTION_MENU_COLOR)
+	local blocksLabel = builder:CreateLabel("Unselected")
 
 	local staticButton = builder:CreateButton("Set static blocks", ACTION_MENU_COLOR)
 	local staticLabel = builder:CreateLabel("Unselected")
@@ -67,6 +64,16 @@ do
 		
 		return newText
 	end
+
+	local function blockIterator(set, func)
+		for _, instance in next, set do
+			if instance:IsA("BasePart") then
+				func(instance)
+			end
+
+			blockIterator(instance:GetChildren(), func)
+		end
+	end
 	
 	-- handle plugin state
 	-- reducers
@@ -82,8 +89,7 @@ do
 
 	local setReducer = function(state, action)
 		state = state or {
-			collidables = {};
-			uncollidables = {};
+			blocks = {};
 			statics = {};
 			actions = {};
 			start = false;
@@ -117,16 +123,10 @@ do
 
 	store.changed:connect(function(newState, oldState)
 		-- update User Interface
-		if #newState.sets.collidables > 0 then
-			collidableLabel.Text = getSelectionInfo(newState.sets.collidables)
+		if #newState.sets.blocks > 0 then
+			blocksLabel.Text = getSelectionInfo(newState.sets.blocks)
 		else
-			collidableLabel.Text = "Unselected"
-		end
-		
-		if #newState.sets.uncollidables > 0 then
-			uncollidableLabel.Text = getSelectionInfo(newState.sets.uncollidables)
-		else
-			uncollidableLabel.Text = "Unselected"
+			blocksLabel.Text = "Unselected"
 		end
 		
 		if #newState.sets.statics > 0 then
@@ -168,12 +168,8 @@ do
 		}
 	end
 
-	collidableButton.MouseButton1Click:Connect(function()
-		dispatchSelection("collidables")
-	end)
-	
-	uncollidableButton.MouseButton1Click:Connect(function()
-		dispatchSelection("uncollidables")
+	blocksButton.MouseButton1Click:Connect(function()
+		dispatchSelection("blocks")
 	end)
 	
 	staticButton.MouseButton1Click:Connect(function()
@@ -232,23 +228,17 @@ do
 		local smallestZPosition = startPos.Z
 		
 		-- fix for bad users
-		for _, item in ipairs(state.sets.collidables) do
-			if item.Position.Z < smallestZPosition then
-				smallestZPosition = item.Position.Z
+		blockIterator(state.sets.blocks, function(block)
+			if block.Position.Z < smallestZPosition then
+				smallestZPosition = block.Position.Z
 			end
-		end
+		end)
 
-		for _, item in ipairs(state.sets.uncollidables) do
-			if item.Position.Z < smallestZPosition then
-				smallestZPosition = item.Position.Z
+		blockIterator(state.sets.actions, function(block)
+			if block.Position.Z < smallestZPosition then
+				smallestZPosition = block.Position.Z
 			end
-		end
-
-		for _, item in ipairs(state.sets.actions) do
-			if item.Position.Z < smallestZPosition then
-				smallestZPosition = item.Position.Z
-			end
-		end
+		end)
 		
 		-- chunks
 		local chunks = {}
@@ -287,27 +277,21 @@ do
 			
 			return chunk
 		end
+
+		-- place blocks into chunks
+		blockIterator(state.sets.blocks, function(block)
+			local chunk = getChunk(block.Position)
+			local newPart = block:Clone()
+			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
+			newPart.Parent = newPart.CanCollide and chunk.Collidables or chunk.Uncollidables
+		end)
 		
-		for _, part in ipairs(state.sets.collidables) do
-			local chunk = getChunk(part.Position)
-			local newPart = part:Clone()
-			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
-			newPart.Parent = chunk.Collidables
-		end
-
-		for _, part in ipairs(state.sets.uncollidables) do
-			local chunk = getChunk(part.Position)
-			local newPart = part:Clone()
-			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
-			newPart.Parent = chunk.Uncollidables
-		end
-
-		for _, part in ipairs(state.sets.actions) do
-			local chunk = getChunk(part.Position)
-			local newPart = part:Clone()
+		blockIterator(state.sets.actions, function(block)
+			local chunk = getChunk(block.Position)
+			local newPart = block:Clone()
 			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
 			newPart.Parent = chunk.Actions
-		end
+		end)
 		
 		-- build settings module script
 		local _settings = Instance.new("ModuleScript")
@@ -322,10 +306,10 @@ Settings.StartPosition = Vector3.new(%s, %s, %s)
 Settings.AnimationZones = {
 	-- example start:
 	[1] = {
-		Insert = function(part, endPosition)
+		Insert = function(part, endCFrame)
 			-- animate the part into existence here
 		end;
-		Delete = function(part, startPosition)
+		Delete = function(part, startCFrame)
 			-- animate the part out of existence here
 		end;
 		ZoneReached = function(character, mapFolder)
@@ -336,13 +320,13 @@ Settings.AnimationZones = {
 	-- example continuation:
 	[20] = {
 		-- keeps the same insert animation zone from the previous one ([1])
-		Delete = function(part, startPosition)
+		Delete = function(part, startCFrame)
 			-- animate the part out of existence here
 		end;
 	};
 
 	[30] = {
-		Insert = function(part, endPosition)
+		Insert = function(part, endCFrame)
 			-- animate the part into existence here
 		end;
 		-- keeps the same delete animation zone from the previous one ([20])
