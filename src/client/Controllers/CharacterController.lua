@@ -16,7 +16,7 @@ local Janitor = require(Packages.Janitor)
     Controls anything related to the character.
 ]=]
 local CharacterController = Knit.CreateController {
-    Name = "CharacterController"
+    Name = "CharacterController";
 }
 
 --[=[
@@ -30,6 +30,12 @@ local CharacterController = Knit.CreateController {
     @within CharacterController
 
     The position of the character model, updated every frame that the character exists.
+]=]
+--[=[
+    @prop CharacterEnum table
+    @within CharacterController
+
+    Same as ``Character.Enum``, from the Character Component.
 ]=]
 --[=[
     @prop _janitor Janitor
@@ -87,6 +93,18 @@ local CharacterController = Knit.CreateController {
     ```
 ]=]
 --[=[
+    @prop CharacterStateChanged GoodSignal
+    @within Character
+    @tag events
+
+    Event that fires when the character changes states.
+
+    Called with:
+    ```
+    state: StateChanged -- The new state of the character
+    ```
+]=]
+--[=[
     @prop CharacterDestroyed GoodSignal
     @within CharacterController
     @tag events
@@ -95,6 +113,7 @@ local CharacterController = Knit.CreateController {
 ]=]
 function CharacterController:KnitInit()
     -- Create variables
+    self.CharacterEnum = CharacterComponent.Enum;
     self.CharacterPosition = Vector3.new(0,0,0)
     self._janitor = Janitor.new()
     self._timePassed = 0
@@ -105,6 +124,7 @@ function CharacterController:KnitInit()
     self.CharacterMoved = Signal.new()
     self.CharacterDied = Signal.new()
     self.CharacterDestroyed = Signal.new()
+    self.CharacterStateChanged = Signal.new()
 
     -- step the character based on the fixed frame rate
     game:GetService("RunService").RenderStepped:Connect(function(dt)
@@ -181,6 +201,10 @@ function CharacterController:CreateCharacter()
 
     self._janitor:Add(character.Died:Connect(function(...)
         self.CharacterDied:Fire(...)
+    end))
+
+    self._janitor:Add(character.StateChanged:Connect(function(...)
+        self.CharacterStateChanged:Fire(...)
     end))
 
     self._janitor:Add(character.Destroyed:Connect(function(...)

@@ -1,4 +1,5 @@
 -- Imports
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Components = script.Parent.Parent.Components
@@ -57,6 +58,66 @@ function MapController:KnitStart()
             map:Move(character, position)
         end
     end)
+
+    CharacterController.CharacterStateChanged:Connect(function(...)
+        self:ChangeState(...)
+    end)
+end
+
+function MapController:ChangeState(state, speed)
+    local CharacterController = Knit.GetController("CharacterController")
+
+    local map = self.Map
+    local _state = self._state
+
+    if map ~= nil and state ~= _state then
+        local statics = map.StaticsFolder
+        if statics ~= nil then
+            local floors = statics:FindFirstChild("Floor")
+            local ceilings = statics:FindFirstChild("Ceiling")
+            local stateName = state == CharacterController.CharacterEnum.State.Default and "Default" or "Flying"
+
+            local tweenInfo = TweenInfo.new(speed or 0.3, Enum.EasingStyle.Quint)
+
+            if floors then
+                for _, floor in ipairs(floors:GetChildren()) do
+                    if floor.Name == stateName then
+                        local tween = TweenService:Create(floor, tweenInfo, {
+                            CFrame = floor.CFrame + Vector3.new(0,25,0);
+                        })
+
+                        tween:Play()
+                    else
+                        local tween = TweenService:Create(floor, tweenInfo, {
+                            CFrame = floor.CFrame - Vector3.new(0,25,0);
+                        })
+
+                        tween:Play()
+                    end
+                end
+            end
+
+            if ceilings then
+                for _, ceiling in ipairs(ceilings:GetChildren()) do
+                    if ceiling.Name == stateName then
+                        local tween = TweenService:Create(ceiling, tweenInfo, {
+                            CFrame = ceiling.CFrame - Vector3.new(0,25,0);
+                        })
+
+                        tween:Play()
+                    else
+                        local tween = TweenService:Create(ceiling, tweenInfo, {
+                            CFrame = ceiling.CFrame + Vector3.new(0,25,0);
+                        })
+
+                        tween:Play()
+                    end
+                end
+            end
+        end
+
+        self._state = state
+    end
 end
 
 --[=[
@@ -76,6 +137,10 @@ function MapController:LoadMap(mapName, leftVision, rightVision)
     if mapFolder then
         -- create and store the map component
         local map = MapComponent.new(mapFolder, leftVision or LEFT_VISION, rightVision or RIGHT_VISION)
+
+        -- update local state
+        local CharacterController = Knit.GetController("CharacterController")
+        self._state = CharacterController.CharacterEnum.State.Default
 
         self:ReloadMap(map)
         self.Map = map
@@ -97,9 +162,13 @@ function MapController:ReloadMap(map)
     map = map or self.Map
 
     if map ~= nil then
+        local CharacterController = Knit.GetController("CharacterController")
+
         local chunks, startPosition = map:Reload()
         self.StartPosition = startPosition
         self.Chunks = chunks
+
+        self:ChangeState(CharacterController.CharacterEnum.State.Default, 0)
     end
 end
 

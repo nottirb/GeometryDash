@@ -79,6 +79,12 @@ Character.Enum.State = {
     Will always be "Character". Used to check the class name of the object.
 ]=]
 --[=[
+    @prop State State
+    @within Character
+
+    The state of the character.
+]=]
+--[=[
     @prop Model Model
     @within Character
 
@@ -136,6 +142,18 @@ Character.Enum.State = {
     ```
 ]=]
 --[=[
+    @prop StateChanged GoodSignal
+    @within Character
+    @tag events
+
+    Event that fires when the character changes states.
+
+    Called with:
+    ```
+    state: StateChanged -- The new state of the character
+    ```
+]=]
+--[=[
     @prop Destroyed GoodSignal
     @within Character
     @tag events
@@ -174,6 +192,7 @@ function Character.new(collisionGroup, imageProps)
 
     -- Add public properties
     self.ClassName = "Character"
+    self.State = Character.Enum.State.Default
     self.Model = characterModel
     self.RootPart = rootPart
     self.Speed = SPEED
@@ -184,10 +203,10 @@ function Character.new(collisionGroup, imageProps)
     self.Died = Signal.new()
     self.Destroyed = Signal.new()
     self.Moved = Signal.new()
+    self.StateChanged = Signal.new()
 
     -- Add private properties
     self._alive = true
-    self._state = Character.Enum.State.Default
     self._gravityDirection = -1
     self._stepHeight = DEFAULT_STEP_HEIGHT
     self._raycastParams = raycastParams
@@ -225,6 +244,7 @@ function Character:Destroy()
     self.Model:Destroy()
     self.Died:Destroy()
     self.Moved:Destroy()
+    self.StateChanged:Destroy()
     self.Destroyed:Fire()
     self.Destroyed:Destroy()
 end
@@ -368,21 +388,26 @@ end
     Sets the state of the character.
 ]=]
 function Character:SetState(state)
-    -- set state
-    self._state = state
+    if state ~= self.State then
+        -- set state
+        self.State = state
 
-    -- state specific updates
-    if state == Character.Enum.State.Default then
-        self._rotationSpring.Target = self._rotationSpring.Position
+        -- state specific updates
+        if state == Character.Enum.State.Default then
+            self._rotationSpring.Target = self._rotationSpring.Position
 
-    elseif state == Character.Enum.State.Flying then
-        self.Velocity = self.Velocity*XZ_VECTOR3 + Vector3.new(0, math.clamp(self.Velocity.Y, FLYING_TERMINAL_VELOCITY, -FLYING_TERMINAL_VELOCITY))
-        self._rotationSpring.Target = -math.pi/8*self.Velocity.Y/FLYING_TERMINAL_VELOCITY
-        self._rotationSpring.Position = self._rotationSpring.Target
+        elseif state == Character.Enum.State.Flying then
+            self.Velocity = self.Velocity*XZ_VECTOR3 + Vector3.new(0, math.clamp(self.Velocity.Y, FLYING_TERMINAL_VELOCITY, -FLYING_TERMINAL_VELOCITY))
+            self._rotationSpring.Target = -math.pi/8*self.Velocity.Y/FLYING_TERMINAL_VELOCITY
+            self._rotationSpring.Position = self._rotationSpring.Target
+        end
+
+        -- update character image
+        self._imageLabel.Image = self._imageProps[state]
+
+        -- fire event
+        self.StateChanged:Fire(state)
     end
-
-    -- update character image
-    self._imageLabel.Image = self._imageProps[state]
 end
 
 --[=[
@@ -407,7 +432,7 @@ function Character:_isGrounded(position, velocity)
         return downResult, downLength
 
     -- otherwise if we're flying and going up, return an upward cast
-    elseif self._state == Character.Enum.State.Flying and velocity.Y > 0 then
+    elseif self.State == Character.Enum.State.Flying and velocity.Y > 0 then
         return self:_castUp(position, 0.2)
     end
 end
@@ -510,7 +535,7 @@ function Character:_updatePosition(position, velocity, dt)
 
     -- get various values that are reused
     local xVelocity, yVelocity = (velocity*MOVEMENT_DIRECTION).Magnitude, velocity.Y
-    local state = self._state
+    local state = self.State
     local gravityDirection = Vector3.new(0, self._gravityDirection, 0)
 
     -- check if we can go up if our velocity indicates we're moving up
@@ -615,7 +640,7 @@ function Character:Step(dt)
     local jumping = self.Jumping
 
     -- calculate the velocity based on the current state of the character
-    if self._state == Character.Enum.State.Default then
+    if self.State == Character.Enum.State.Default then
         -- move forwards
         velocity = velocity*Y_VECTOR3 + MOVEMENT_DIRECTION*speed
 
@@ -637,7 +662,7 @@ function Character:Step(dt)
         -- account for terminal velocity
         velocity = velocity*XZ_VECTOR3 + Vector3.new(0, math.max(velocity.Y, DEFAULT_TERMINAL_VELOCITY), 0)
 
-    elseif self._state == Character.Enum.State.Flying then
+    elseif self.State == Character.Enum.State.Flying then
         -- move forwards
         velocity = velocity*Y_VECTOR3 + MOVEMENT_DIRECTION*speed
 
@@ -661,7 +686,7 @@ function Character:Step(dt)
             velocity *= XZ_VECTOR3
 
             -- in the default state, have the character match the rotation of the ground
-            if self._state == Character.Enum.State.Default then
+            if self.State == Character.Enum.State.Default then
                 -- get the normal and rotation of the surface the character is standing on
                 local normal = groundResult.Normal
                 local surfaceRotation = self._gravityDirection*math.atan2(normal.Z, -self._gravityDirection*normal.Y)
@@ -703,7 +728,7 @@ function Character:Step(dt)
         end
         
         -- if we're flying then calculate the rotation based on the vertical velocity of the character.
-        if self._state == Character.Enum.State.Flying then
+        if self.State == Character.Enum.State.Flying then
             self._rotationSpring.Target = -math.pi/8*velocity.Y/FLYING_TERMINAL_VELOCITY
         end  
 
@@ -716,11 +741,11 @@ function Character:Step(dt)
         if self:IsAlive() then
             self._walkEffect:Enable(self._grounded or self._jumpTime < 0.0425)
 
-            if self._state == Character.Enum.State.Default then
+            if self.State == Character.Enum.State.Default then
                 self._trailEffect:Enable(self.Velocity.Magnitude > self.Speed*2)
                 self._flightTrailEffect:Enable(false)
 
-            elseif self._state == Character.Enum.State.Flying then
+            elseif self.State == Character.Enum.State.Flying then
                 self._trailEffect:Enable(false)
                 self._flightTrailEffect:Enable(true)
             end

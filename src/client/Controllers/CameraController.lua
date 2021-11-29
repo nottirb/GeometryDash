@@ -9,7 +9,8 @@ local Janitor = require(Packages.Janitor)
 
 -- Constants
 local CAMERA_ANGLE = CFrame.Angles(0,-math.pi/2,0)
-local CAMERA_OFFSET = Vector3.new(-15, 6, 8)
+local CAMERA_OFFSET = Vector3.new(-17, 6, 8)
+local FLYING_CAMERA_OFFSET = Vector3.new(-17, 14, 8)
 local Y_GIVE = 4
 
 local XZ_VECTOR3 = Vector3.new(1, 0, 1)
@@ -104,28 +105,36 @@ function CameraController:SetState(state)
         self.State = state
 
         if state == CameraController.Enum.State.Following then
+            local CharacterController = Knit.GetController("CharacterController")
+
             local ySpring = self._ySpring
             local yPosition = 0
 
-            self._stateJanitor:Add(Knit.GetController("CharacterController").CharacterMoved:Connect(function(position, _, characterOffset)
-                if self.State == CameraController.Enum.State.Following then
-                    -- break up positional data
-                    local xzPosition = position*XZ_VECTOR3
-					local charYPosition = position.Y - characterOffset
-					local yOffset = yPosition + CAMERA_OFFSET.Y - charYPosition
-                    local absYOffset = math.abs(yOffset)
+            self._stateJanitor:Add(CharacterController.CharacterMoved:Connect(function(position, _, characterOffset)
+                local character = CharacterController.Character
 
-                    -- recalculate y position
-                    if yOffset > Y_GIVE then -- camera needs to go down
-                        yPosition = yPosition - (absYOffset - Y_GIVE + (2 - absYOffset%2))
-                    elseif yOffset < -Y_GIVE then -- camera needs to go up
-						yPosition = yPosition + (absYOffset - Y_GIVE + (2 - absYOffset%2))
+                if self.State == CameraController.Enum.State.Following and character ~= nil then
+                    if character.State == character.Enum.State.Default then
+                        -- break up positional data
+                        local xzPosition = position*XZ_VECTOR3
+                        local charYPosition = position.Y - characterOffset
+                        local yOffset = yPosition + CAMERA_OFFSET.Y - charYPosition
+                        local absYOffset = math.abs(yOffset)
+
+                        -- recalculate y position
+                        if yOffset > Y_GIVE then -- camera needs to go down
+                            yPosition = yPosition - (absYOffset - Y_GIVE + (2 - absYOffset%2))
+                        elseif yOffset < -Y_GIVE then -- camera needs to go up
+                            yPosition = yPosition + (absYOffset - Y_GIVE + (2 - absYOffset%2))
+                        end
+
+                        ySpring.Target = yPosition
+
+                        -- set overall position
+                        self.Camera.CFrame = CAMERA_ANGLE + xzPosition + Vector3.new(0, ySpring.Position, 0) + CAMERA_OFFSET
+                    elseif character.State == character.Enum.State.Flying then
+                        self.Camera.CFrame = CAMERA_ANGLE + position*XZ_VECTOR3 + FLYING_CAMERA_OFFSET
                     end
-
-                    ySpring.Target = yPosition
-
-                    -- set overall position
-					self.Camera.CFrame = CAMERA_ANGLE + xzPosition + Vector3.new(0, ySpring.Position, 0) + CAMERA_OFFSET
                 end
             end))
         end

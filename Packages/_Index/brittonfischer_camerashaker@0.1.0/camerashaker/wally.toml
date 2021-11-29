@@ -1,0 +1,11 @@
+[package]
+name = "brittonfischer/camerashaker"
+description = "Camera shake effects for Roblox games. Ported from sleitnick/RbxCameraShaker"
+version = "0.1.0"
+license = "Apache-2.0"
+authors = ["Stephen Leitnick", "Scarious"]
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+exclude = ["test", "test.project.json", "DevPackages"]
+
+[dependencies]
