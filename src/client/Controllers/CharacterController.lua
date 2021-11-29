@@ -20,6 +20,12 @@ local CharacterController = Knit.CreateController {
 }
 
 --[=[
+    @prop Character Character
+    @within CharacterController
+
+    The current Character component.
+]=]
+--[=[
     @prop CharacterPosition Vector3
     @within CharacterController
 
@@ -94,6 +100,7 @@ function CharacterController:KnitInit()
     self._timePassed = 0
 
     -- Create events
+    self.Character = nil
     self.CharacterAdded = Signal.new()
     self.CharacterMoved = Signal.new()
     self.CharacterDied = Signal.new()
@@ -129,9 +136,13 @@ function CharacterController:KnitStart()
     end)
 
     -- TEMP
+    local MapController = Knit.GetController("MapController")
+    MapController:LoadMap("TestMap")
+
     UserInputService.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Keyboard then
             if input.KeyCode == Enum.KeyCode.Q then
+                MapController:ReloadMap()
                 CharacterController:CreateCharacter()
             end
         end
@@ -149,6 +160,16 @@ function CharacterController:CreateCharacter()
     -- verify that no character currently exists
     if self.Character then
         self.Character:Destroy()
+    end
+
+    -- get the start position of the character
+    local MapController = Knit.GetController("MapController")
+    local map = MapController.Map
+    local startPosition = MapController.StartPosition
+
+    if not map or not startPosition then
+        warn("Tried to create a character, but no map is currently loaded.")
+        return
     end
 
     -- create the new character and bind events

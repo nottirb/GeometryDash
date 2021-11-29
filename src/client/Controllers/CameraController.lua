@@ -10,7 +10,7 @@ local Janitor = require(Packages.Janitor)
 -- Constants
 local CAMERA_ANGLE = CFrame.Angles(0,-math.pi/2,0)
 local CAMERA_OFFSET = Vector3.new(-15, 6, 8)
-local Y_GIVE = 6
+local Y_GIVE = 4
 
 local XZ_VECTOR3 = Vector3.new(1, 0, 1)
 

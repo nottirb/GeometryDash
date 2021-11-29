@@ -202,6 +202,9 @@ do
 	
 	-- compiling
 	buildButton.MouseButton1Click:Connect(function()
+		local start = os.clock()
+		print("[Map Compiler]: Beginning map compilation")
+
 		-- get state
 		local state = store:getState()
 		assert(state.sets.start ~= false, "You must select a starting point")
@@ -224,6 +227,8 @@ do
 		end
 		
 		-- build chunks
+		print("[Map Compiler]: Getting starting position")
+
 		local startPos = state.sets.start.Position
 		local smallestZPosition = startPos.Z
 		
@@ -241,6 +246,8 @@ do
 		end)
 		
 		-- chunks
+		print("[Map Compiler]: Compiling chunks")
+
 		local chunks = {}
 		local zOffset = -smallestZPosition
 		
@@ -284,6 +291,12 @@ do
 			local newPart = block:Clone()
 			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
 			newPart.Parent = newPart.CanCollide and chunk.Collidables or chunk.Uncollidables
+
+			for _, child in ipairs(newPart:GetChildren()) do
+				if child:IsA("BasePart") then
+					child:Destroy()
+				end
+			end
 		end)
 		
 		blockIterator(state.sets.actions, function(block)
@@ -292,6 +305,8 @@ do
 			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
 			newPart.Parent = chunk.Actions
 		end)
+		
+		print("[Map Compiler]: Compiling final map")
 		
 		-- build settings module script
 		local _settings = Instance.new("ModuleScript")
@@ -306,13 +321,13 @@ Settings.StartPosition = Vector3.new(%s, %s, %s)
 Settings.AnimationZones = {
 	-- example start:
 	[1] = {
-		Insert = function(part, endCFrame)
+		Insert = function(part, endCFrame, imageLabel)
 			-- animate the part into existence here
 		end;
-		Delete = function(part, startCFrame)
+		Delete = function(part, startCFrame, imageLabel)
 			-- animate the part out of existence here
 		end;
-		ZoneReached = function(character, mapFolder)
+		ZoneReached = function(character, map)
 			-- called once whenever you reach this zone
 		end,
 	};
@@ -320,13 +335,13 @@ Settings.AnimationZones = {
 	-- example continuation:
 	[20] = {
 		-- keeps the same insert animation zone from the previous one ([1])
-		Delete = function(part, startCFrame)
+		Delete = function(part, startCFrame, imageLabel)
 			-- animate the part out of existence here
 		end;
 	};
 
 	[30] = {
-		Insert = function(part, endCFrame)
+		Insert = function(part, endCFrame, imageLabel)
 			-- animate the part into existence here
 		end;
 		-- keeps the same delete animation zone from the previous one ([20])
@@ -343,5 +358,7 @@ return Settings]]
 		_settings.Parent = mapFolder
 
 		mapFolder.Parent = game:GetService("ReplicatedStorage")
+		
+		print(("[Map Compiler]: Map compilation finished (%sms)"):format((math.ceil((os.clock() - start)*10000))/10))
 	end)
 end

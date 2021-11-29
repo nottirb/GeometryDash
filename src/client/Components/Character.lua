@@ -13,12 +13,12 @@ local CHARACTER_BASE = Assets.Character
 local CHARACTER_HEIGHT = CHARACTER_BASE.PrimaryPart.Size.Y
 local CHARACTER_WIDTH = CHARACTER_BASE.PrimaryPart.Size.Z
 
-local SPEED = 10.3761348898*2*1.1
+local SPEED = 10.3761348898*2--*1.1
 local MOVEMENT_DIRECTION = Vector3.new(0,0,1)
 local MAX_SLOPE_ANGLE = math.rad(40)
 
-local DEFAULT_GRAVITY = -8.76*SPEED*(1.1^2)
-local DEFUALT_JUMP_VELOCITY = math.sqrt(-4*2.14*DEFAULT_GRAVITY)
+local DEFAULT_GRAVITY = -8.76*SPEED--*(1.1^2)
+local DEFUALT_JUMP_VELOCITY = math.sqrt(-4*2*DEFAULT_GRAVITY)
 local DEFAULT_STEP_HEIGHT = 0.5
 local DEFAULT_TERMINAL_VELOCITY = -2.6*SPEED
 
@@ -59,9 +59,15 @@ Character.Enum.State = {
 --[=[
     @function new
     @within Character
+
+    @param startPosition Vector3? -- Starting position of the character, defaults to <0,0,0>
+    @param collisionGroup string? -- Collision group of the character, defaults to "Collidables"
+    @param imageProps [State: string]? -- The image properties of the character, give each state its own image. Defaults to default character image properties.
+
     @return Character -- generated Character object
 
-    Generates a character model at [0,0,0], and builds a Character object to handle its physics.
+    Generates a character model at ``startPosition``, and builds a Character object to handle its physics. 
+    You can update the collision group as time goes on by calling ``:SetCollisionGroup(string)``.
 ]=]
 
 --[=[
@@ -128,14 +134,31 @@ Character.Enum.State = {
 
     Event that fires when the character is destroyed. Is not called with anything.
 ]=]
-function Character.new()
+function Character.new(collisionGroup, imageProps)
     -- Pre-build
     local characterModel = CHARACTER_BASE:Clone()
     local rootPart = characterModel:WaitForChild("RootPart")
+    local imageLabel = rootPart:WaitForChild("SurfaceGui"):WaitForChild("ImageLabel")
     characterModel.Parent = workspace -- temp
 
+    local defaultImageProps = {
+        [Character.Enum.State.Default] = "rbxassetid://8129619631";
+        [Character.Enum.State.Flying] = "rbxassetid://8129619341";
+    }
+
+    imageProps = imageProps or defaultImageProps;
+
+    for state, id in next, defaultImageProps do
+        if not imageProps[state] then
+            imageProps[state] = id
+        end
+    end
+
+    imageLabel.Image = imageProps[Character.Enum.State.Default]
+
     local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {characterModel}
+    raycastParams.CollisionGroup = collisionGroup or "Collidables"
+    raycastParams.FilterDescendantsInstances = {}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 
     -- Create Class object
@@ -149,6 +172,8 @@ function Character.new()
     self._raycastParams = raycastParams
     self._timePassed = 0
     self._grounded = false
+    self._imageProps = imageProps
+    self._imageLabel = imageLabel
     
     local function clock()
         return self._timePassed
@@ -207,6 +232,17 @@ function Character:Kill(position)
 end
 
 -- Casting utility
+--[=[
+    @within Character
+
+    @param collisionGroup string -- sets the collision group for the character, defaults to "Collidables"
+
+    Sets the raycast collision group for the physics engine
+]=]
+function Character:SetCollisionGroup(collisionGroup)
+    self._raycastParams.CollisionGroup = collisionGroup or "Collidables"
+end
+
 --[=[
     @within Character
     @private
@@ -317,8 +353,10 @@ end
     Sets the state of the character.
 ]=]
 function Character:SetState(state)
+    -- set state
     self._state = state
 
+    -- state specific updates
     if state == Character.Enum.State.Default then
         self._rotationSpring.Target = self._rotationSpring.Position
 
@@ -327,6 +365,9 @@ function Character:SetState(state)
         self._rotationSpring.Target = -math.pi/8*self.Velocity.Y/FLYING_TERMINAL_VELOCITY
         self._rotationSpring.Position = self._rotationSpring.Target
     end
+
+    -- update character image
+    self._imageLabel.Image = self._imageProps[state]
 end
 
 --[=[
@@ -459,8 +500,8 @@ function Character:_updatePosition(position, velocity, dt)
         local upCastLength = yVelocity*dt
         local upResult, upResultLength = self:_castUp(position, upCastLength)
 
-        -- kill the player if they hit a ceiling
-        if upResult and state ~= Character.Enum.State.Flying then
+        -- kill the player if they hit kill block or the ceiling
+        if upResult and (upResult.Instance.Name == "Kill" or state ~= Character.Enum.State.Flying) then
             self:Kill(position)
             return
         end
@@ -474,6 +515,12 @@ function Character:_updatePosition(position, velocity, dt)
         local forwardResult, forwardLength = self:_castForwards(position, forwardCastLength)
 
         if forwardResult then
+            -- kill the player if they hit kill block
+            if forwardResult.Instance.Name == "Kill" then
+                self:Kill(position)
+                return
+            end
+
             -- try to step up
             local stepHeight = state == Character.Enum.State.Default and self:_shouldStepUp(position + MOVEMENT_DIRECTION*forwardLength)
 
@@ -504,6 +551,12 @@ function Character:_updatePosition(position, velocity, dt)
     if yVelocity < 0 then
         local downCastLength = -yVelocity*dt
         local downResult, downLength = self:_castDown(position, downCastLength)
+
+        -- kill the player if they hit a kill block
+        if downResult and downResult.Instance.Name == "Kill" then
+            self:Kill(position)
+            return
+        end
 
         -- move down by the length of the downwards cast if it exists, otherwise move down the full distance
         if downResult and downLength then
