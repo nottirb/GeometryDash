@@ -53,6 +53,7 @@ function MapController:KnitStart()
         local map = self.Map
 
         if character ~= nil and character:IsAlive() and map ~= nil then
+            -- move the map according to character movement
             map:Move(character, position)
         end
     end)

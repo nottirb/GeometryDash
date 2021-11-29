@@ -3,6 +3,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 
 local Knit = require(Packages.Knit)
+local InputController
 
 local WAY_OUT_THERE = CFrame.new(100000,100000,100000)
 
@@ -20,6 +21,9 @@ Map.CollisionGroups = {
 local currentMap
 
 function Map.new(baseMap, leftVision, rightVision)
+    -- get input controller
+    InputController = InputController or Knit.GetController("InputController")
+
     -- return existing map if the base map is the same as the current base map
     if currentMap and currentMap._base == baseMap then
         return currentMap
@@ -63,6 +67,8 @@ function Map.new(baseMap, leftVision, rightVision)
         for index, part in ipairs(chunkFolder.Actions:GetChildren()) do
             local gui = part:FindFirstChild("SurfaceGui")
             local image = gui and gui:FindFirstChild("ImageLabel")
+            local actionModule = part:FindFirstChild("Action")
+            local action = actionModule and require(actionModule)
 
             if image then
                 image.ImageTransparency = 1
@@ -72,6 +78,7 @@ function Map.new(baseMap, leftVision, rightVision)
                 Instance = part;
                 CFrame = part.CFrame;
                 Image = image;
+                Action = action;
             }
 
             -- move super far away
@@ -153,6 +160,10 @@ function Map:Reload()
         -- update part CFrame's
         for _, data in ipairs(chunkData.Actions) do
             data.Instance.CFrame = WAY_OUT_THERE
+            
+            if data.Action then
+                data.Action:Disable()
+            end
         end
 
         for _, data in ipairs(chunkData.Collidables) do
@@ -260,6 +271,10 @@ function Map:Move(character, newPosition)
         
                     for _, data in ipairs(chunkData.Actions) do
                         task.spawn(delete, data.Instance, data.CFrame, data.Image)
+
+                        if data.Action then
+                            data.Action:Disable()
+                        end
                     end
         
                     for _, data in ipairs(chunkData.Uncollidables) do
@@ -318,6 +333,15 @@ function Map:Move(character, newPosition)
 
                 if reached ~= nil then
                     task.spawn(reached, character, self)
+                end
+            end
+        end
+
+        -- update actions
+        for _, chunkData in next, self.Chunks do
+            for _, data in ipairs(chunkData.Actions) do
+                if data.Action then
+                    data.Action:Update(character, newPosition, InputController)
                 end
             end
         end

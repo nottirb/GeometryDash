@@ -8,6 +8,8 @@ local Signal = require(Packages.Signal)
 local Spring = require(Packages.Spring)
 local Linecast = require(Shared.Linecast)
 
+local EffectComponent = require(script.Parent.Effect)
+
 -- constants
 local CHARACTER_BASE = Assets.Character
 local CHARACTER_HEIGHT = CHARACTER_BASE.PrimaryPart.Size.Y
@@ -70,6 +72,12 @@ Character.Enum.State = {
     You can update the collision group as time goes on by calling ``:SetCollisionGroup(string)``.
 ]=]
 
+--[=[
+    @prop ClassName string
+    @within Character
+
+    Will always be "Character". Used to check the class name of the object.
+]=]
 --[=[
     @prop Model Model
     @within Character
@@ -164,6 +172,19 @@ function Character.new(collisionGroup, imageProps)
     -- Create Class object
     local self = setmetatable({}, Character)
 
+    -- Add public properties
+    self.ClassName = "Character"
+    self.Model = characterModel
+    self.RootPart = rootPart
+    self.Speed = SPEED
+    self.Position = Vector3.new(0, 1, 0)
+    self.Velocity = Vector3.new(0, 0, SPEED)
+    
+    -- Create events
+    self.Died = Signal.new()
+    self.Destroyed = Signal.new()
+    self.Moved = Signal.new()
+
     -- Add private properties
     self._alive = true
     self._state = Character.Enum.State.Default
@@ -171,9 +192,15 @@ function Character.new(collisionGroup, imageProps)
     self._stepHeight = DEFAULT_STEP_HEIGHT
     self._raycastParams = raycastParams
     self._timePassed = 0
+    self._jumpTime = 0
     self._grounded = false
     self._imageProps = imageProps
     self._imageLabel = imageLabel
+    self._walkEffect = EffectComponent.new(self, Vector3.new(0,math.sin(math.rad(150)),math.cos(math.rad(150))).Unit, "ParticleEmitter", "Walk", Vector3.new(-0.85,-1,-1))
+    self._trailEffect = EffectComponent.new(self, Vector3.new(0,0,-1), "Trail", "Trail")
+    self._trailEffect:Enable(false)
+    self._flightTrailEffect = EffectComponent.new(self, Vector3.new(0,0,-1), "Trail", "FlightTrail", Vector3.new(0.9,0.6,-0.9))
+    self._flightTrailEffect:Enable(false)
     
     local function clock()
         return self._timePassed
@@ -181,18 +208,6 @@ function Character.new(collisionGroup, imageProps)
     
     self._rotationSpring = Spring.new(0, clock)
     self._rotationSpring.Speed = 50
-
-    -- Add public properties
-    self.Model = characterModel
-    self.RootPart = rootPart
-    self.Speed = SPEED
-    self.Position = Vector3.new(0, 1, 0)
-    self.Velocity = Vector3.new(0, 0, SPEED)
-
-    -- Create events
-    self.Died = Signal.new()
-    self.Destroyed = Signal.new()
-    self.Moved = Signal.new()
 
     -- Set default position
     characterModel:SetPrimaryPartCFrame(DEFAULT_CFRAME + self.Position)
@@ -465,6 +480,9 @@ function Character:_moveTo(position, groundOffset)
     -- update the internal last position
     self._lastPosition = newPosition
 
+    -- update trail rotation
+    self._flightTrailEffect:Rotate(DEFAULT_CFRAME*CFrame.Angles(self._rotationSpring.Position + math.pi, 0, 0))
+
     -- fire the .Moved event and set the character model's cframe to match the position and rotation of the character.
     self.Moved:Fire(newPosition, lastPosition, self._gravityDirection*groundOffset)
     self.Model:SetPrimaryPartCFrame(DEFAULT_CFRAME*CFrame.Angles(self._rotationSpring.Position, 0, 0) + newPosition)
@@ -585,6 +603,7 @@ function Character:Step(dt)
 
     -- update the time passed for the internal clock
     self._timePassed += dt
+    self._jumpTime += dt
 
     -- don't step if the character isn't alive
     if self._alive ~= true then
@@ -603,6 +622,7 @@ function Character:Step(dt)
         -- if we're grounded and jumping, and not moving upwards, then change the velocity to go up
         if self:IsGrounded() and jumping and velocity.Y <= 0 then
             velocity = velocity*XZ_VECTOR3 + Vector3.new(0, DEFUALT_JUMP_VELOCITY*speed/SPEED, 0)
+            self._jumpTime = 0
 
         -- otherwise apply gravity, rotate the character if we're not grounded
         else
@@ -691,6 +711,20 @@ function Character:Step(dt)
         self._grounded = groundResult ~= nil
         self.Position = position
         self.Velocity = velocity
+
+        -- effects
+        if self:IsAlive() then
+            self._walkEffect:Enable(self._grounded or self._jumpTime < 0.0425)
+
+            if self._state == Character.Enum.State.Default then
+                self._trailEffect:Enable(self.Velocity.Magnitude > self.Speed*2)
+                self._flightTrailEffect:Enable(false)
+
+            elseif self._state == Character.Enum.State.Flying then
+                self._trailEffect:Enable(false)
+                self._flightTrailEffect:Enable(true)
+            end
+        end
     end
 
     debug.profileend()
