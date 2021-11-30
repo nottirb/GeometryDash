@@ -72,7 +72,9 @@ function InputController:KnitStart()
     keybinds.Jump = {
         Enum.KeyCode.Space, 
         Enum.KeyCode.Up,
-        Enum.UserInputType.MouseButton1
+        Enum.KeyCode.ButtonA,
+        Enum.UserInputType.MouseButton1,
+        Enum.UserInputType.Touch
     }
 
     self.Keybinds = keybinds
@@ -82,6 +84,7 @@ function InputController:KnitStart()
         -- get input data for faster parsing
         local inputType = input.UserInputType
         local isKeyboard = inputType == Enum.UserInputType.Keyboard
+        local isGamepad = inputType == Enum.UserInputType.Gamepad1
         local keyCode = input.KeyCode
 
         -- check all keybinds for changes
@@ -90,7 +93,8 @@ function InputController:KnitStart()
                 -- iterate through keybind data to check for changes
                 for _, keybindInput in ipairs(keybindData) do
                     if (keybindInput == inputType)
-                    or (isKeyboard and keybindInput == keyCode) then
+                    or (isKeyboard and keybindInput == keyCode)
+                    or (isGamepad and keybindInput == keyCode) then
                         -- update state
                         self._states[stateName] = active
                         self.StateChanged[stateName]:Fire(active)
