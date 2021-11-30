@@ -9,7 +9,7 @@ local Maps = ReplicatedStorage:WaitForChild("Maps")
 local Knit = require(Packages.Knit)
 
 -- Constants
-local LEFT_VISION = 3
+local LEFT_VISION = 6
 local RIGHT_VISION = 15
 
 --[=[
@@ -44,6 +44,7 @@ function MapController:KnitInit()
     -- store variables
     self.Map = nil
     self.StartPosition = nil
+    self._music = workspace:WaitForChild("Music")
 end
 
 function MapController:KnitStart()
@@ -57,6 +58,15 @@ function MapController:KnitStart()
             -- move the map according to character movement
             map:Move(character, position)
         end
+    end)
+
+    CharacterController.CharacterDied:Connect(function(_, win)
+        if win then
+            if self.Map ~= nil then
+                self.Map._attempt = 0
+            end
+        end
+        self._music:Stop()
     end)
 
     CharacterController.CharacterStateChanged:Connect(function(...)
@@ -167,6 +177,9 @@ function MapController:ReloadMap(map)
         local chunks, startPosition = map:Reload()
         self.StartPosition = startPosition
         self.Chunks = chunks
+
+        self._music.TimePosition = 13.25
+        self._music:Play()
 
         self:ChangeState(CharacterController.CharacterEnum.State.Default, 0)
     end

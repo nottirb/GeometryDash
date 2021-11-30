@@ -14,7 +14,7 @@ local actionObjects = "Actions"
 local collidableObjects = "Collidables"
 
 Map.CollisionGroups = {
-    Actions = actionObjects;
+    Actions = collidableObjects;
     Collidables = collidableObjects
 }
 
@@ -42,7 +42,7 @@ function Map.new(baseMap, leftVision, rightVision)
     local chunksFolder = Instance.new("Folder")
 
     for _, staticInstance in ipairs(staticsFolder:GetDescendants()) do
-        if staticInstance:IsA("BasePart") then
+        if staticInstance:IsA("BasePart") and staticInstance.CanCollide == true then
             PhysicsService:SetPartCollisionGroup(staticInstance, collidableObjects)
         end
     end
@@ -135,10 +135,13 @@ function Map.new(baseMap, leftVision, rightVision)
     self._rightVision = rightVision or 10
     self._insertAnimation = function() end
     self._deleteAnimation = function() end
+    self._attempt = 0
 
     self.Chunks = {}
     self.StaticsFolder = staticsFolder
     self.ChunksFolder = chunksFolder
+
+    self._attemptsText = staticsFolder:WaitForChild("Attempts"):WaitForChild("SurfaceGui"):WaitForChild("TextLabel")
 
     currentMap = self
 
@@ -154,7 +157,14 @@ function Map:Destroy()
     setmetatable(self, nil)
 end
 
-function Map:Reload()
+function Map:Reload(resetAttempts)
+    if resetAttempts then
+        self._attempt = 0
+    end
+    self._attempt += 1
+    self._attemptsText.Text = "Attempt: " .. self._attempt
+
+
     -- clear existing chunks
     for index, chunkData in next, self.Chunks do
         -- update part CFrame's
@@ -223,13 +233,14 @@ function Map:Reload()
     self._currentChunk = startChunk
     self.Chunks = newChunks
 
-    local insertIndex, deleteIndex = 0, 0
-    local insertAnimation, deleteAnimation
+    local insertIndex, deleteIndex, zoneIndex = 0, 0, 0
+    local insertAnimation, deleteAnimation, zoneReached
 
     for index, animationData in next, self._settings.AnimationZones do
         if index <= startChunk then
             local insert = animationData.Insert
             local delete = animationData.Delete
+            local zone = animationData.ZoneReached
 
             if insert ~= nil and (insertAnimation == nil or index > insertIndex) then
                 insertAnimation = insert
@@ -240,7 +251,16 @@ function Map:Reload()
                 deleteAnimation = delete
                 deleteIndex = index
             end
+            
+            if zone ~= nil and (zoneReached == nil or index > zoneIndex) then
+                zoneReached = zone
+                zoneIndex = index
+            end
         end
+    end
+
+    if zoneReached then
+        task.spawn(zoneReached, nil, self)
     end
 
     self._deleteAnimation = deleteAnimation
@@ -301,7 +321,9 @@ function Map:Move(character, newPosition)
                 end
 
                 for _, data in ipairs(chunkData.Actions) do
-                    PhysicsService:SetPartCollisionGroup(data.Instance, actionObjects)
+                    if data.Instance.CanCollide == true then
+                        PhysicsService:SetPartCollisionGroup(data.Instance, collidableObjects)
+                    end
                     task.spawn(insert, data.Instance, data.CFrame, data.Image)
                 end
 
@@ -336,13 +358,14 @@ function Map:Move(character, newPosition)
                 end
             end
         end
+    end
+    
 
-        -- update actions
-        for _, chunkData in next, self.Chunks do
-            for _, data in ipairs(chunkData.Actions) do
-                if data.Action then
-                    data.Action:Update(character, newPosition, InputController)
-                end
+    -- update actions
+    for _, chunkData in next, self.Chunks do
+        for _, data in ipairs(chunkData.Actions) do
+            if data.Action then
+                data.Action:Update(character, newPosition, InputController)
             end
         end
     end

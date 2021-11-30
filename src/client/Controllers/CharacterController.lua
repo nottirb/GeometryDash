@@ -117,6 +117,7 @@ function CharacterController:KnitInit()
     self.CharacterPosition = Vector3.new(0,0,0)
     self._janitor = Janitor.new()
     self._timePassed = 0
+    self._died = workspace:WaitForChild("Oof")
 
     -- Create events
     self.Character = nil
@@ -159,6 +160,16 @@ function CharacterController:KnitStart()
     local MapController = Knit.GetController("MapController")
     MapController:LoadMap("TestMap")
 
+    CharacterController.CharacterDestroyed:Connect(function()
+        task.delay(1.3, function()
+            MapController:ReloadMap()
+            CharacterController:CreateCharacter()
+        end)
+    end)
+
+    CharacterController:CreateCharacter()
+
+    --[[
     UserInputService.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.Keyboard then
             if input.KeyCode == Enum.KeyCode.Q then
@@ -168,7 +179,7 @@ function CharacterController:KnitStart()
         end
     end)
     
-    Knit.GetController("CameraController"):SetState(Knit.GetController("CameraController").Enum.State.Following)
+    Knit.GetController("CameraController"):SetState(Knit.GetController("CameraController").Enum.State.Following)]]
 end
 
 --[=[
@@ -193,14 +204,19 @@ function CharacterController:CreateCharacter()
     end
 
     -- create the new character and bind events
-    local character = CharacterComponent.new()
+    local character = CharacterComponent.new(startPosition)
     
     self._janitor:Add(character.Moved:Connect(function(...)
         self.CharacterMoved:Fire(...)
     end))
 
-    self._janitor:Add(character.Died:Connect(function(...)
-        self.CharacterDied:Fire(...)
+    self._janitor:Add(character.Died:Connect(function(pos, win)
+        if not win then
+            self._died.TimePosition = 0.1
+            self._died:Play()
+        end
+        
+        self.CharacterDied:Fire(pos, win)
     end))
 
     self._janitor:Add(character.StateChanged:Connect(function(...)

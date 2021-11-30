@@ -38,6 +38,26 @@ local BASE_EFFECTS = {
         };
         Lifetime = 0.3;
     };
+    Death = {
+        Texture = "rbxassetid://8131342280";
+        Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.new(0,1,1)),
+            ColorSequenceKeypoint.new(1, Color3.new(0,1,1))
+        };
+        Transparency = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(1, 1)
+        };
+        Size = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 0.25),
+            NumberSequenceKeypoint.new(1, 0.05)
+        };
+        SpreadAngle = Vector2.new(180, 0);
+        Lifetime = NumberRange.new(0.2, 0.5),
+        Rate = 250;
+        Speed = NumberRange.new(20,30);
+        EmissionDirection = Enum.NormalId.Front;
+    }
 }
 
 local Effect = {}
@@ -124,7 +144,10 @@ function Effect.new(location, direction, type, props, offset, timeAlive)
     if timeAlive ~= nil then
         task.delay(timeAlive, function()
             if self and object ~= nil then
-                self:Destroy()
+                self:Enable(false)
+                task.delay(3, function()
+                    self:Destroy()
+                end)
             end
         end)
     end

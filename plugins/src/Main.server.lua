@@ -305,6 +305,10 @@ do
 			newPart.CFrame = newPart.CFrame + Vector3.new(0,0,zOffset)
 			newPart.Parent = chunk.Actions
 		end)
+
+		blockIterator(staticFolder:GetChildren(), function(block)
+			block.CFrame = block.CFrame + Vector3.new(0,0,zOffset)
+		end)
 		
 		print("[Map Compiler]: Compiling final map")
 		

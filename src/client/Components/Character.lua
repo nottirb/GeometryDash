@@ -160,7 +160,7 @@ Character.Enum.State = {
 
     Event that fires when the character is destroyed. Is not called with anything.
 ]=]
-function Character.new(collisionGroup, imageProps)
+function Character.new(startPosition, collisionGroup, imageProps)
     -- Pre-build
     local characterModel = CHARACTER_BASE:Clone()
     local rootPart = characterModel:WaitForChild("RootPart")
@@ -196,7 +196,7 @@ function Character.new(collisionGroup, imageProps)
     self.Model = characterModel
     self.RootPart = rootPart
     self.Speed = SPEED
-    self.Position = Vector3.new(0, 1, 0)
+    self.Position = startPosition or Vector3.new(0, 1, 0)
     self.Velocity = Vector3.new(0, 0, SPEED)
     
     -- Create events
@@ -211,6 +211,7 @@ function Character.new(collisionGroup, imageProps)
     self._stepHeight = DEFAULT_STEP_HEIGHT
     self._raycastParams = raycastParams
     self._timePassed = 0
+    self._physicsPassed = 0
     self._jumpTime = 0
     self._grounded = false
     self._imageProps = imageProps
@@ -220,6 +221,7 @@ function Character.new(collisionGroup, imageProps)
     self._trailEffect:Enable(false)
     self._flightTrailEffect = EffectComponent.new(self, Vector3.new(0,0,-1), "Trail", "FlightTrail", Vector3.new(0.9,0.6,-0.9))
     self._flightTrailEffect:Enable(false)
+    self._forceJump = false
     
     local function clock()
         return self._timePassed
@@ -256,14 +258,54 @@ end
 
     Kills the Character, eventually calling ``:Destroy()`` on it aswell.
 ]=]
-function Character:Kill(position)
+function Character:Kill(position, finished)
     if self._alive then
         self._alive = false
-        self.Died:Fire(position or self.Position)
 
-        -- temp
-        self:Destroy()
+        task.spawn(function()
+            -- effect
+            EffectComponent.new(position or self.Position, Vector3.new(0,0,-1), "ParticleEmitter", "Death", nil, 0.125)
+        end)
+
+        -- fire event
+        if finished then
+            -- spazz out
+
+            -- play win sound
+            local win = workspace:FindFirstChild("Win")
+            if win then
+                win:Play()
+            end
+
+            -- die
+            self.Died:Fire(position or self.Position, true)
+
+            local tween = game:GetService("TweenService"):Create(self.RootPart, TweenInfo.new(3, Enum.EasingStyle.Circular, Enum.EasingDirection.InOut), {
+                CFrame = (self.RootPart.CFrame + Vector3.new(0,16,40)) * CFrame.Angles(math.pi, 0, 0)
+            })
+
+            tween.Completed:Connect(function()
+                tween:Destroy()
+                self:Destroy()
+            end)
+
+            tween:Play()
+        else
+            self.Died:Fire(position or self.Position)
+
+            -- temp
+            self:Destroy()
+        end
     end
+end
+
+--[=[
+    @within Character
+
+    Makes the character jump
+]=]
+function Character:ForceJump()
+    self._forceJump = true
 end
 
 -- Casting utility
@@ -427,8 +469,8 @@ function Character:_isGrounded(position, velocity)
     -- cast downwards
     local downResult, downLength = self:_castDown(position, 0.2)
 
-    -- return the downward cast if we're going down
-    if downResult and velocity.Y < 0 then
+    -- return the downward cast if we're going down, or "grounded"
+    if downResult and velocity.Y <= 0 then
         return downResult, downLength
 
     -- otherwise if we're flying and going up, return an upward cast
@@ -562,6 +604,9 @@ function Character:_updatePosition(position, velocity, dt)
             if forwardResult.Instance.Name == "Kill" then
                 self:Kill(position)
                 return
+            elseif forwardResult.Instance.Name == "End" then
+                self:Kill(position, true)
+                return
             end
 
             -- try to step up
@@ -645,13 +690,19 @@ function Character:Step(dt)
         velocity = velocity*Y_VECTOR3 + MOVEMENT_DIRECTION*speed
 
         -- if we're grounded and jumping, and not moving upwards, then change the velocity to go up
-        if self:IsGrounded() and jumping and velocity.Y <= 0 then
+        if (self:IsGrounded() and jumping and velocity.Y <= 0) or self._forceJump then
             velocity = velocity*XZ_VECTOR3 + Vector3.new(0, DEFUALT_JUMP_VELOCITY*speed/SPEED, 0)
             self._jumpTime = 0
+            self._forceJump = false
 
         -- otherwise apply gravity, rotate the character if we're not grounded
         else
-            velocity += Vector3.new(0, dt*DEFAULT_GRAVITY*speed/SPEED, 0)
+            self._physicsPassed += dt
+
+            while self._physicsPassed >= 1/60 do
+                velocity += Vector3.new(0, (DEFAULT_GRAVITY*speed/SPEED)/60, 0)
+                self._physicsPassed -= 1/60
+            end
 
             if not self:IsGrounded() then
                 self._rotationSpring.Target += self._gravityDirection*2.4*math.pi*dt
