@@ -9,7 +9,7 @@ local Maps = ReplicatedStorage:WaitForChild("Maps")
 local Knit = require(Packages.Knit)
 
 -- Constants
-local LEFT_VISION = 6
+local LEFT_VISION = 2
 local RIGHT_VISION = 15
 
 --[=[
