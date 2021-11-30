@@ -21,12 +21,15 @@ Now you should be able to either build onto the existing gameplay engine.
 
 ## Roadmaps
 *todo: move roadmaps to issues after first open-source release*
+
 ### Definitions
-**Shipped**: this feature has been shipped into the production build of the game
-**Testing**: this feature has been implemented into the test build, and is undergoing testing
-**In progress**: this feature is being actively worked on
-**Investigating**: this feature is going to be added, but is not yet being actively worked on
-**Planned**: this feature is desired, but is not yet guaranteed to be added into the game
+Definition | Meaning
+---- | ----
+**Shipped** | this feature has been shipped into the production build of the game
+**Testing** | this feature has been implemented into the test build, and is undergoing testing
+**In progress** | this feature is being actively worked on
+**Investigating** | this feature is going to be added, but is not yet being actively worked on
+**Planned** | this feature is desired, but is not yet guaranteed to be added into the game
 
 ### Technical roadmap
 Name | Purpose | Status
