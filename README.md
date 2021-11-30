@@ -17,6 +17,7 @@ To contribute to the gameplay engine, you must first install of the project's de
 *todo: document full installation process*
 
 Now you should be able to either build onto the existing gameplay engine.
+**Warning:** You are not yet able to contribute as the full game is not yet buildable from Github. This is an in-progress requirement for the initial github release.
 
 ## Roadmaps
 *todo: move roadmaps to issues after first open-source release*
