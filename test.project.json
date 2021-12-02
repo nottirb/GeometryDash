@@ -7,7 +7,29 @@
             "$properties": {
                 "ExecuteWithStudioRun": true
             },
-            "$path": "test"
+            "$path": "test",
+            "src": {
+                "$path": "src"
+            },
+            "DevPackages": {
+                "$path": "DevPackages"
+            }
+        },
+        "ReplicatedStorage": {
+            "$className": "ReplicatedStorage",
+            "$ignoreUnknownInstances": true,
+            "Shared": {
+                "$path": "src/shared"
+            },
+            "Packages": {
+                "$path": "Packages"
+            }
+        },
+        "ServerScriptService": {
+            "$className": "ServerScriptService",
+            "ServerPackages": {
+                "$path": "ServerPackages"
+            }
         }
     }
 }
