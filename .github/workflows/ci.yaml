@@ -4,23 +4,12 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'github/workflows/ci.yaml'
-      - 'src/**'
-      - 'test/**'
-      - 'test.project.json'
 
   pull_request:
     branches:
       - main
-    paths:
-      - 'github/workflows/ci.yaml'
-      - 'src/**'
-      - 'test/**'
-      - 'test.project.json'
-
+      
 jobs:
-
   lint:
     name: Lint
     runs-on: ubuntu-latest
