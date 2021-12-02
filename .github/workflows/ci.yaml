@@ -5,16 +5,18 @@ on:
     branches:
       - main
     paths:
-      - 'src/*'
-      - 'test/*'
+      - 'github/workflows/ci.yaml'
+      - 'src/**'
+      - 'test/**'
       - 'test.project.json'
 
   pull_request:
     branches:
       - main
     paths:
-      - 'src'
-      - 'test'
+      - 'github/workflows/ci.yaml'
+      - 'src/**'
+      - 'test/**'
       - 'test.project.json'
 
 jobs:
