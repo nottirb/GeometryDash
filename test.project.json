@@ -8,35 +8,7 @@
                 "ExecuteWithStudioRun": true
             },
             "test": {
-                "$path": "test",
-                "src": {
-                    "$className": "Folder",
-                    "server": {
-                        "$path": "src/server"
-                    },
-                    "client": {
-                        "$path": "src/client"
-                    }
-                },
-                "DevPackages": {
-                    "$path": "DevPackages"
-                }
-            }
-        },
-        "ReplicatedStorage": {
-            "$className": "ReplicatedStorage",
-            "$ignoreUnknownInstances": true,
-            "Shared": {
-                "$path": "src/shared"
-            },
-            "Packages": {
-                "$path": "Packages"
-            }
-        },
-        "ServerScriptService": {
-            "$className": "ServerScriptService",
-            "ServerPackages": {
-                "$path": "ServerPackages"
+                "$path": "test"
             }
         }
     }
