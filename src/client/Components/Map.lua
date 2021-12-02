@@ -9,7 +9,6 @@ local WAY_OUT_THERE = CFrame.new(100000,100000,100000)
 
 local Map = {}
 Map.__index = Map
-
 local actionObjects = "Actions"
 local collidableObjects = "Collidables"
 

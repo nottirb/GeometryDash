@@ -7,18 +7,20 @@
             "$properties": {
                 "ExecuteWithStudioRun": true
             },
-            "$path": "test",
-            "src": {
-                "$className": "Folder",
-                "server": {
-                    "$path": "src/server"
+            "test": {
+                "$path": "test",
+                "src": {
+                    "$className": "Folder",
+                    "server": {
+                        "$path": "src/server"
+                    },
+                    "client": {
+                        "$path": "src/client"
+                    }
                 },
-                "client": {
-                    "$path": "src/client"
+                "DevPackages": {
+                    "$path": "DevPackages"
                 }
-            },
-            "DevPackages": {
-                "$path": "DevPackages"
             }
         },
         "ReplicatedStorage": {

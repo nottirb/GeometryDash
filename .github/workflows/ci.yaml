@@ -3,10 +3,19 @@ name: CI
 on:
   push:
     branches:
-    - main
+      - main
+    paths:
+      - 'src'
+      - 'test'
+      - 'test.project.json'
+
   pull_request:
     branches:
-    - main
+      - main
+    paths:
+      - 'src'
+      - 'test'
+      - 'test.project.json'
 
 jobs:
 
