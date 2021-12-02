@@ -8,7 +8,7 @@ apiCategories = [
 [docusaurus]
 onBrokenLinks = "throw"
 onBrokenMarkdownLinks = "warn"
-url = "https://www.brittonfischer.com"
+url = "https://docs.brittonfischer.com"
 
 [footer]
 style = "dark"
