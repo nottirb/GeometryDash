@@ -11,3 +11,10 @@ Promise = "evaera/promise@3.1.0"
 Signal = "sleitnick/signal@1.0.1"
 Spring = "brittonfischer/spring@0.1.0"
 CameraShaker = "brittonfischer/camerashaker@0.1.0"
+ReplicaService = "brittonfischer/replicaservice@0.1.0"
+
+[server-dependencies]
+ProfileService = "brittonfischer/profileservice@2.1.5"
+
+[dev-dependencies]
+TestEZ = "roblox/testez@0.4.1"

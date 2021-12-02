@@ -1,5 +1,5 @@
 -- Imports
-local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Components = script.Parent.Parent.Components
@@ -43,14 +43,6 @@ local CharacterController = Knit.CreateController {
     @private
 
     Controls the cleanup of the character and all associated events.
-]=]
---[=[
-    @prop _timePassed number
-    @within CharacterController
-    @private
-
-    The amount of time passed since the last character update. Since there is a fixed frame rate to guarantee the accuracy of the gameplay physics, 
-    this number will always represent whatever is left over from the last physics update, to be continued on the next frame.
 ]=]
 --[=[
     @prop CharacterAdded GoodSignal
@@ -116,7 +108,6 @@ function CharacterController:KnitInit()
     self.CharacterEnum = CharacterComponent.Enum;
     self.CharacterPosition = Vector3.new(0,0,0)
     self._janitor = Janitor.new()
-    self._timePassed = 0
     self._died = workspace:WaitForChild("Oof")
 
     -- Create events
@@ -129,17 +120,19 @@ function CharacterController:KnitInit()
 
     -- step the character based on the fixed frame rate
     game:GetService("RunService").RenderStepped:Connect(function(dt)
-        -- get the character
-        local character = self.Character
+        if not GuiService.MenuIsOpen then
+            -- get the character
+            local character = self.Character
 
-        if character ~= nil then
-            -- update the character
-            character:Step(dt)
+            if character ~= nil then
+                -- update the character
+                character:Step(dt)
 
-            -- update stored character position
-            -- note that although we already checked if the character was nil, the character could have died during the character:Step(dt) call, so we have to check again
-            if character ~= nil and character:IsAlive() then
-                self.CharacterPosition = character.Position
+                -- update stored character position
+                -- note that although we already checked if the character was nil, the character could have died during the character:Step(dt) call, so we have to check again
+                if character ~= nil and character:IsAlive() then
+                    self.CharacterPosition = character.Position
+                end
             end
         end
     end)
@@ -168,18 +161,6 @@ function CharacterController:KnitStart()
     end)
 
     CharacterController:CreateCharacter()
-
-    --[[
-    UserInputService.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Keyboard then
-            if input.KeyCode == Enum.KeyCode.Q then
-                MapController:ReloadMap()
-                CharacterController:CreateCharacter()
-            end
-        end
-    end)
-    
-    Knit.GetController("CameraController"):SetState(Knit.GetController("CameraController").Enum.State.Following)]]
 end
 
 --[=[
@@ -233,9 +214,6 @@ function CharacterController:CreateCharacter()
         -- cleanup all associated character events and data
         self._janitor:Cleanup()
     end))
-
-    -- reset time passed
-    self._timePassed = 0
 
     -- store character
     self.Character = character

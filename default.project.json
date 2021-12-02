@@ -1,5 +1,5 @@
 {
-    "name": "Geometry-Dash",
+    "name": "GeometryDash",
     "tree": {
         "$className": "DataModel",
         "ReplicatedStorage": {
@@ -16,6 +16,9 @@
             "$className": "ServerScriptService",
             "Server": {
                 "$path": "src/server"
+            },
+            "ServerPackages": {
+                "$path": "ServerPackages"
             }
         },
         "StarterPlayer": {
@@ -24,6 +27,18 @@
                 "$className": "StarterPlayerScripts",
                 "Client": {
                     "$path": "src/client"
+                },
+                "BubbleChat": {
+                    "$className": "LocalScript"
+                },
+                "PlayerScriptsLoader": {
+                    "$className": "LocalScript"
+                },
+                "PlayerModule": {
+                    "$className": "ModuleScript"
+                },
+                "RbxCharacterSounds": {
+                    "$className": "LocalScript"
                 }
             }
         }

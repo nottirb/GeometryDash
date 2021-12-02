@@ -48,14 +48,14 @@ Character.Enum = {}
     @tag enum
     @within Character
     
-    .Default 0 -- Default movement state
-    .Flying 1 -- Flying movement state
+    .Default "Default" -- Default movement state
+    .Flying "Flying" -- Flying movement state
 
     Represents the movement state of the character.
 ]=]
 Character.Enum.State = {
-    Default = 0;
-    Flying = 1;
+    Default = "Default";
+    Flying = "Flying";
 }
 
 --[=[

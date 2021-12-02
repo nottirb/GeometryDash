@@ -1,6 +1,14 @@
-# Project place file
-/GeometryDash.rbxlx
+# Folders
+*.zip
+/Packages
+/ServerPackages
+/DevPackages
+/test/Packages
+/test/modules
+/test
+/docs
 
-# Roblox Studio lock files
+# Project place files
+/*.rbxlx
 /*.rbxlx.lock
 /*.rbxl.lock

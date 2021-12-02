@@ -10,7 +10,17 @@ dependencies = []
 [[package]]
 name = "brittonfischer/geometrydash"
 version = "0.1.0"
-dependencies = [["CameraShaker", "brittonfischer/camerashaker@0.1.0"], ["Janitor", "howmanysmall/janitor@1.13.14"], ["Knit", "sleitnick/knit@1.0.9"], ["Promise", "evaera/promise@3.1.0"], ["Signal", "sleitnick/signal@1.0.1"], ["Spring", "brittonfischer/spring@0.1.0"]]
+dependencies = [["CameraShaker", "brittonfischer/camerashaker@0.1.0"], ["Janitor", "howmanysmall/janitor@1.13.14"], ["Knit", "sleitnick/knit@1.0.9"], ["Promise", "evaera/promise@3.1.0"], ["ReplicaService", "brittonfischer/replicaservice@0.1.0"], ["Signal", "sleitnick/signal@1.0.1"], ["Spring", "brittonfischer/spring@0.1.0"]]
+
+[[package]]
+name = "brittonfischer/profileservice"
+version = "2.1.5"
+dependencies = []
+
+[[package]]
+name = "brittonfischer/replicaservice"
+version = "0.1.0"
+dependencies = []
 
 [[package]]
 name = "brittonfischer/spring"
@@ -25,6 +35,11 @@ dependencies = []
 [[package]]
 name = "howmanysmall/janitor"
 version = "1.13.14"
+dependencies = []
+
+[[package]]
+name = "roblox/testez"
+version = "0.4.1"
 dependencies = []
 
 [[package]]

@@ -48,6 +48,17 @@ local InputController = Knit.CreateController {
 
     Holds all of the keybind data. Keybind data is setup such that you have a string equal to any number of ``Enum.UserInputType``'s or ``Enum.KeyCode``'s.
 ]=]
+--[=[
+    @prop PrimaryInput string
+    @within InputController
+
+    Explicity states what the primary input is, which can be any one of the following:
+        - "Mouse"
+        - "Gamepad"
+        - "Touch"
+    
+    Note that the keyboard is not considered to be a "primary input", as it is not directly used to interact with the UI or world space.
+]=]
 function InputController:KnitInit()
     -- Setup states
     local states = {
@@ -63,6 +74,11 @@ function InputController:KnitInit()
     -- Store state and event data
     self._states = states
     self.StateChanged = stateChanged
+
+    -- Primary input type
+    self.PrimaryInputChanged = Signal.new()
+    self.PrimaryInput = self:_determinePrimaryInput()
+    self._lastInputType = nil
 end
 
 function InputController:KnitStart()
@@ -80,7 +96,7 @@ function InputController:KnitStart()
     self.Keybinds = keybinds
 
     -- Connect keybinds to input
-    local function inputChanged(input, _gameProcessed, active)
+    local function inputSwitched(input, _gameProcessed, active)
         -- get input data for faster parsing
         local inputType = input.UserInputType
         local isKeyboard = inputType == Enum.UserInputType.Keyboard
@@ -105,15 +121,80 @@ function InputController:KnitStart()
                 end
             end
         end
+
+        -- recalculate primary input
+        self:_determinePrimaryInput(inputType)
     end
 
-    UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        inputChanged(input, gameProcessed, true)
+    -- UserInputService binds
+    UserInputService.InputBegan:Connect(function(input, _gameProcessed)
+        -- keybinds and primary input detection
+        inputSwitched(input, _gameProcessed, true)
     end)
 
-    UserInputService.InputEnded:Connect(function(input, gameProcessed)
-        inputChanged(input, gameProcessed, false)
+    UserInputService.InputEnded:Connect(function(input, _gameProcessed)
+        -- keybinds and primary input detection
+        inputSwitched(input, _gameProcessed, false)
     end)
+
+    UserInputService.InputChanged:Connect(function(input, _gameProcessed)
+        -- primary input detection
+        self:_determinePrimaryInput(input.UserInputType)
+    end)
+
+    -- temp
+    print(self.PrimaryInput)
+    self.PrimaryInputChanged:Connect(function(primaryInput, oldPrimaryInput)
+        print("New:", primaryInput, "Old:", oldPrimaryInput)
+    end)
+end
+
+function InputController:_determinePrimaryInput(inputType)
+    -- local variables
+    local currentPrimaryInput = self.PrimaryInput
+    local newPrimaryInput
+
+    -- validate input type, don't recalculate if the input type didn't change
+    if self._lastInputType == inputType and currentPrimaryInput ~= nil then
+        return currentPrimaryInput
+
+    else
+        self._lastInputType = inputType
+    end
+
+    -- add bias based on input type, if present
+    if inputType ~= nil then
+        -- we only care about certain input types when calculating a new input based on a bias
+        if inputType == Enum.UserInputType.Touch then
+            newPrimaryInput = "Touch"
+
+        elseif inputType == Enum.UserInputType.Gamepad1 then
+            newPrimaryInput = "Gamepad"
+
+        elseif inputType == Enum.UserInputType.MouseButton1 
+                or inputType == Enum.UserInputType.MouseButton2 
+                or inputType == Enum.UserInputType.MouseButton3
+                or inputType == Enum.UserInputType.MouseMovement
+                or inputType == Enum.UserInputType.MouseWheel then
+                    newPrimaryInput = "Mouse"
+        end
+        
+    -- otherwise make some unbiased determinations
+    else
+        newPrimaryInput = UserInputService.MouseEnabled and "Mouse" 
+            or UserInputService.GamepadEnabled and "Gamepad" 
+            or UserInputService.TouchEnabled and "Touch" 
+            or "Mouse"
+    end
+
+    -- update primary input if we determined that we should use a new input
+    if newPrimaryInput ~= nil and currentPrimaryInput ~= newPrimaryInput then
+        self.PrimaryInputChanged:Fire(newPrimaryInput, currentPrimaryInput)
+        self.PrimaryInput = newPrimaryInput
+    end
+
+    -- return the updated primary input, if we couldn't determine a new primary input, return the current one
+    return newPrimaryInput or currentPrimaryInput
 end
 
 --[=[
