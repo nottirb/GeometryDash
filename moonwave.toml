@@ -1,4 +1,4 @@
-gitSourceBranch = "master"
+gitSourceBranch = "main"
 changelog = false
 classOrder = []
 apiCategories = [
