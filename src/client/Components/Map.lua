@@ -1,3 +1,4 @@
+-- Imports
 local PhysicsService = game:GetService("PhysicsService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
@@ -5,19 +6,82 @@ local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Knit = require(Packages.Knit)
 local InputController
 
+-- Constants
+local COLLIDABLE_OBJECTS = "Collidables"
 local WAY_OUT_THERE = CFrame.new(100000,100000,100000)
 
+--[=[
+    @class Map
+
+    Controls the chunk distribution, animations, and actions of a given map file. 
+    You can only have 1 Map object loaded at a time, calling ``Map.new()`` on a new map file will delete the existing one.
+]=]
 local Map = {}
 Map.__index = Map
-local collidableObjects = "Collidables"
 
-Map.CollisionGroups = {
-    Actions = collidableObjects;
-    Collidables = collidableObjects
-}
+--[=[
+    @interface ChunkData
+    @within Map
 
+    .Instance BasePart -- The BasePart that the chunk data is based on
+    .CFrame CFrame -- The initial CFrame of the Instance
+    .Image ImageLabel? -- The image label for the Instance, if applicable
+    .Action Dict? -- More information to come
+]=]
+
+--[=[
+    @interface Chunk
+    @within Map
+
+    .Folder Folder -- Folder containing that chunk's objects
+    .Actions ChunkData[] -- ChunkData for all actions within that chunk
+    .Collidables ChunkData[] -- ChunkData for all collidable objects within that chunk
+    .Uncollidables ChunkData[] -- ChunkData for all uncollidable objects within that chunk
+
+    Chunk data is used to map out a chunk. Chunk mapping is done for all chunks in a Map whenever ``Map.new()`` is called.
+]=]
+
+-- we can only have 1 map loaded
 local currentMap
 
+--[=[
+    @prop Chunks Chunk[]
+    @within Map
+
+    Contains all of the currently loaded map chunks.
+    
+
+    self.Chunks = {} -- Chunk[], contains all of the loaded map chunks
+    self.StaticsFolder = staticsFolder -- contains all static objects
+    self.ChunksFolder = chunksFolder -- contains all raw chunk objects
+]=]
+
+--[=[
+    @prop StaticsFolder Folder
+    @within Map
+
+    Contains all of the Static map objects. Note that by Static here, it doesn't mean they don't move, but rather that they are abstracted from the chunk loading/unloading system.
+    Basically it contains all of the ``Instance``'s which are permanently loaded into the map. This is useful for things like backgrounds, flooring, ceiling, etc.
+]=]
+
+--[=[
+    @prop ChunksFolder Folder
+    @within Map
+
+    Contains all of the raw chunk data. This is parsed and stored in the ``Chunks`` property.
+]=]
+
+--[=[
+    @within Map
+
+    @param baseMap folder -- The folder to use as the map file's base
+    @param leftVision number -- The vision the character has to the left (# of chunks before an object is deleted)
+    @param rightVision number -- The vision the character has to the right (# of chunks before an object is inserted)
+
+    @return Map -- the Map object
+
+    Creates a new ``Map`` object from a given map file.
+]=]
 function Map.new(baseMap, leftVision, rightVision)
     -- get input controller
     InputController = InputController or Knit.GetController("InputController")
@@ -41,7 +105,7 @@ function Map.new(baseMap, leftVision, rightVision)
 
     for _, staticInstance in ipairs(staticsFolder:GetDescendants()) do
         if staticInstance:IsA("BasePart") and staticInstance.CanCollide == true then
-            PhysicsService:SetPartCollisionGroup(staticInstance, collidableObjects)
+            PhysicsService:SetPartCollisionGroup(staticInstance, COLLIDABLE_OBJECTS)
         end
     end
 
@@ -125,27 +189,32 @@ function Map.new(baseMap, leftVision, rightVision)
     end
 
     -- store objects
-    self._currentChunk = 1;
-    self._base = baseMap
-    self._settings = require(baseMap.Settings)
-    self._chunks = chunks
+    self._currentChunk = 1; -- the current chunk of the character
+    self._base = baseMap -- base map file
+    self._settings = require(baseMap.Settings) -- map settings
+    self._chunks = chunks -- Chunk[], contains all of the map chunks, both loaded and unloaded.
     self._leftVision = leftVision or 5
     self._rightVision = rightVision or 10
-    self._insertAnimation = function() end
-    self._deleteAnimation = function() end
-    self._attempt = 0
+    self._insertAnimation = function() end -- current object insert animation
+    self._deleteAnimation = function() end -- current object deletion animation
+    self._attempt = 0 -- number of attempts
 
-    self.Chunks = {}
-    self.StaticsFolder = staticsFolder
-    self.ChunksFolder = chunksFolder
+    self.Chunks = {} -- Chunk[], contains all of the loaded map chunks
+    self.StaticsFolder = staticsFolder -- contains all static objects
+    self.ChunksFolder = chunksFolder -- contains all raw chunk objects
 
-    self._attemptsText = staticsFolder:WaitForChild("Attempts"):WaitForChild("SurfaceGui"):WaitForChild("TextLabel")
+    self._attemptsText = staticsFolder:WaitForChild("Attempts"):WaitForChild("SurfaceGui"):WaitForChild("TextLabel") -- this sucks, probably should do something about this
 
+    -- return Map
     currentMap = self
-
     return self
 end
 
+--[=[
+    @within Map
+
+    Destroys and cleans up the current Map object.
+]=]
 function Map:Destroy()
     self.StaticsFolder:Destroy()
     self.ChunksFolder:Destroy()
@@ -155,6 +224,16 @@ function Map:Destroy()
     setmetatable(self, nil)
 end
 
+--[=[
+    @within Map
+
+    @param resetAttempts boolean -- Whether or not to reset the number of attempts displayed. (Used when a character beats a map)
+
+    @return Chunk[] -- Array of chunks initially loaded into the map
+    @return Vector3 -- The map's Character starting position
+
+    Reloads the current map file
+]=]
 function Map:Reload(resetAttempts)
     if resetAttempts then
         self._attempt = 0
@@ -267,6 +346,14 @@ function Map:Reload(resetAttempts)
     return newChunks, startPosition
 end
 
+--[=[
+    @within Map
+
+    @param character Character -- The current character object
+    @param newPosition Vector3 -- The new position of the character model in the world space
+
+    Moves the loaded based on the ``Character``'s movement. Will load/unload chunks as necessary. Also handles action updating by calling their ``:Update()`` method.
+]=]
 function Map:Move(character, newPosition)
     local newChunk = math.max(1, newPosition.Z - newPosition.Z%2)/2
     local currentChunk = self._currentChunk
@@ -314,13 +401,13 @@ function Map:Move(character, newPosition)
             if chunkData then
                 -- build actions, collidables, and uncollidables and make them visible
                 for _, data in ipairs(chunkData.Collidables) do
-                    PhysicsService:SetPartCollisionGroup(data.Instance, collidableObjects)
+                    PhysicsService:SetPartCollisionGroup(data.Instance, COLLIDABLE_OBJECTS)
                     task.spawn(insert, data.Instance, data.CFrame, data.Image)
                 end
 
                 for _, data in ipairs(chunkData.Actions) do
                     if data.Instance.CanCollide == true then
-                        PhysicsService:SetPartCollisionGroup(data.Instance, collidableObjects)
+                        PhysicsService:SetPartCollisionGroup(data.Instance, COLLIDABLE_OBJECTS)
                     end
                     task.spawn(insert, data.Instance, data.CFrame, data.Image)
                 end
@@ -357,7 +444,6 @@ function Map:Move(character, newPosition)
             end
         end
     end
-    
 
     -- update actions
     for _, chunkData in next, self.Chunks do
