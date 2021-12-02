@@ -8,8 +8,7 @@ apiCategories = [
 [docusaurus]
 onBrokenLinks = "throw"
 onBrokenMarkdownLinks = "warn"
-url = "https://docs.brittonfischer.com"
-baseUrl = '/geometrydash/'
+url = "https://brittonfischer.com"
 
 [footer]
 style = "dark"
