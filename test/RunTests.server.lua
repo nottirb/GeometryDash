@@ -17,6 +17,4 @@ for _, test in ipairs(TestService.src:GetDescendants()) do
     end
 end
 
-
-
-require(TestService.Packages.TestEZ).TestBootstrap:run(tests)
+require(TestService.DevPackages.TestEZ).TestBootstrap:run(tests)
