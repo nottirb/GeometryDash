@@ -74,6 +74,14 @@ function MapController:KnitStart()
     end)
 end
 
+--[=[
+    @within MapController
+
+    @param state Character.Enum.State -- The character's new state
+    @param speed number -- The speed at which to animate the state change
+
+    Updates the map state based on the Character state. Currently just moves floors/ceilings up/down.
+]=]
 function MapController:ChangeState(state, speed)
     local CharacterController = Knit.GetController("CharacterController")
 

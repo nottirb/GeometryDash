@@ -10,7 +10,7 @@ local Linecast = require(Shared.Linecast)
 
 local EffectComponent = require(script.Parent.Effect)
 
--- constants
+-- Constants
 local CHARACTER_BASE = Assets.Character
 local CHARACTER_HEIGHT = CHARACTER_BASE.PrimaryPart.Size.Y
 local CHARACTER_WIDTH = CHARACTER_BASE.PrimaryPart.Size.Z
