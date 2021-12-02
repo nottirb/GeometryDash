@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkdocs=self.webpackChunkdocs||[]).push([[793],{97868:function(s){s.exports=JSON.parse('{"sourceUrl":"https://git:ghs_fwMbnz6BAVGn6kujqMBdDn8pTPZ5mU2E4rL0@github.com/BrittonFischer/GeometryDash/blob/main","baseUrl":"/geometrydash/","classOrder":[],"apiCategories":["events"]}')}}]);
