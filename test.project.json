@@ -1,5 +1,5 @@
 {
-    "name": "GeometryDash-test",
+    "name": "geometrydash-test",
     "tree": {
         "$className": "DataModel",
         "TestService": {
@@ -7,9 +7,7 @@
             "$properties": {
                 "ExecuteWithStudioRun": true
             },
-            "test": {
-                "$path": "test"
-            }
+            "$path": "test"
         }
     }
 }
