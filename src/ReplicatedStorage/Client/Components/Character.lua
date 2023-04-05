@@ -2,11 +2,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
 local Assets = ReplicatedStorage:WaitForChild("Assets")
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Common = ReplicatedStorage:WaitForChild("Common")
 
 local Signal = require(Packages.Signal)
 local Spring = require(Packages.Spring)
-local Linecast = require(Shared.Linecast)
+local Linecast = require(Common.Linecast)
 
 local EffectComponent = require(script.Parent.Effect)
 
@@ -24,8 +24,8 @@ local DEFUALT_JUMP_VELOCITY = math.sqrt(-4*2*DEFAULT_GRAVITY)
 local DEFAULT_STEP_HEIGHT = 0.5
 local DEFAULT_TERMINAL_VELOCITY = -2.6*SPEED
 
-local FLYING_GRAVITY = -3*SPEED
-local FLYING_TERMINAL_VELOCITY = -SPEED/1.25
+local FLYING_GRAVITY = -5*SPEED
+local FLYING_TERMINAL_VELOCITY = -SPEED/0.9
 
 local Z_VECTOR3 = Vector3.new(0,0,1)
 local Y_VECTOR3 = Vector3.new(0,1,0)
@@ -198,7 +198,7 @@ function Character.new(startPosition, collisionGroup, imageProps)
     self.Speed = SPEED
     self.Position = startPosition or Vector3.new(0, 1, 0)
     self.Velocity = Vector3.new(0, 0, SPEED)
-    
+
     -- Create events
     self.Died = Signal.new()
     self.Destroyed = Signal.new()
@@ -222,11 +222,17 @@ function Character.new(startPosition, collisionGroup, imageProps)
     self._flightTrailEffect = EffectComponent.new(self, Vector3.new(0,0,-1), "Trail", "FlightTrail", Vector3.new(0.9,0.6,-0.9))
     self._flightTrailEffect:Enable(false)
     self._forceJump = false
-    
+
+    self._nextPosition = self.Position
+    self._nextGroundOffset = 0
+    self._lastPosition = self.Position
+    self._lastGroundOffset = 0
+    self._nextFrame = os.clock()
+
     local function clock()
         return self._timePassed
     end
-    
+
     self._rotationSpring = Spring.new(0, clock)
     self._rotationSpring.Speed = 50
 
@@ -628,7 +634,7 @@ function Character:_updatePosition(position, velocity, dt)
                 self:Kill(position)
                 return
             end
-            
+
         else
             -- move forwards by forwardCastLength
             position += MOVEMENT_DIRECTION*forwardCastLength
@@ -668,7 +674,7 @@ end
     Updates the internal clock, and handles the core physics calculations of the Character object. 
     Moves the character model, determines whether or not the character is grounded, and rotates the model accordingly.
 ]=]
-function Character:Step(dt)
+function Character:InternalStep(dt)
     debug.profilebegin("CharacterStep")
 
     -- update the time passed for the internal clock
@@ -726,6 +732,7 @@ function Character:Step(dt)
 
     -- move the character
     local position = self:_updatePosition(self.Position, velocity, dt)
+    local groundOffset = 0
 
     if position and self:IsAlive() then
         -- check if the character is grounded
@@ -745,7 +752,7 @@ function Character:Step(dt)
                 -- if the surface rotation is greater than the max slope angle, kill the character
                 if math.abs(surfaceRotation) > MAX_SLOPE_ANGLE + 0.01 then
                     self:Kill()
-                    
+
                 -- otherwise, set the target rotation to match the surface rotation
                 else
                     local currentTargetRotation = self._rotationSpring.Target
@@ -764,24 +771,15 @@ function Character:Step(dt)
                         self._rotationSpring.Speed = 50
                     end
 
-                    local groundOffset = math.abs(math.sin(surfaceRotation))
-                    self:_moveTo(position, groundOffset)
+                    groundOffset = math.abs(math.sin(surfaceRotation))
                 end
-
-            -- otherwise just move the character to the new position
-            else
-                self:_moveTo(position, 0)
             end
-
-        -- otherwise just move the character to the new position
-        else
-            self:_moveTo(position, 0)
         end
-        
+
         -- if we're flying then calculate the rotation based on the vertical velocity of the character.
         if self.State == Character.Enum.State.Flying then
             self._rotationSpring.Target = -math.pi/8*velocity.Y/FLYING_TERMINAL_VELOCITY
-        end  
+        end
 
         -- update internal and external variables
         self._grounded = groundResult ~= nil
@@ -804,6 +802,53 @@ function Character:Step(dt)
     end
 
     debug.profileend()
+
+    return position, groundOffset
+end
+
+function Character:Step()
+    -- Don't step if the character isn't alive
+    if self._alive ~= true then
+        return
+    end
+
+    -- Pull variables
+    local lastPosition, lastGroundOffset = self._lastPosition, self._lastGroundOffset
+    local nextPosition, nextGroundOffset = self._nextPosition, self._nextGroundOffset
+    local nextFrame = self._nextFrame
+    local lastFrame = nextFrame - 1/60
+
+    -- Update physics
+    local currentTime = os.clock()
+    local timePassed = currentTime - lastFrame
+
+    while timePassed > 1/60 do
+        lastPosition, lastGroundOffset = nextPosition, nextGroundOffset
+        nextPosition, nextGroundOffset = self:InternalStep(1/60)
+        nextFrame += 1/60
+        lastFrame += 1/60
+        timePassed = currentTime - lastFrame
+    end
+
+    -- Store variables
+    self._lastPosition = lastPosition
+    self._lastGroundOffset = lastGroundOffset
+    self._nextPosition = nextPosition
+    self._nextGroundOffset = nextGroundOffset
+    self._nextFrame = nextFrame
+
+    -- Value checks
+    if lastPosition == nil or nextPosition == nil then
+        return
+    end
+
+    -- Interpolate
+    local alpha = (currentTime - lastFrame)/(nextFrame - lastFrame)
+    local position = lastPosition:Lerp(nextPosition, alpha)
+    local groundOffset = lastGroundOffset + (nextGroundOffset - lastGroundOffset)*alpha
+
+    -- Update character
+    self:_moveTo(position, groundOffset)
 end
 
 -- return the Character component

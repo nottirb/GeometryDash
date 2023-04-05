@@ -2,7 +2,9 @@
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Packages = ReplicatedStorage:WaitForChild("Packages")
-local Components = script.Parent.Parent.Components
+local Client = ReplicatedStorage:WaitForChild("Client")
+
+local Components = Client.Components
 
 local MapComponent = require(Components.Map)
 local Maps = ReplicatedStorage:WaitForChild("Maps")

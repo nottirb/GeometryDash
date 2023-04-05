@@ -2,32 +2,33 @@
     "name": "GeometryDash",
     "tree": {
         "$className": "DataModel",
+		"ServerScriptService": {
+			"$className": "ServerScriptService",
+			"$path": "src/ServerScriptService",
+			"ServerPackages": {
+				"$path": "ServerPackages"
+			}
+		},
+
         "ReplicatedStorage": {
             "$className": "ReplicatedStorage",
             "$ignoreUnknownInstances": true,
-            "Shared": {
-                "$path": "src/shared"
+            "Common": {
+                "$path": "src/ReplicatedStorage/Common"
             },
+			"Client": {
+				"$path": "src/ReplicatedStorage/Client"
+			},
             "Packages": {
                 "$path": "Packages"
             }
         },
-        "ServerScriptService": {
-            "$className": "ServerScriptService",
-            "Server": {
-                "$path": "src/server"
-            },
-            "ServerPackages": {
-                "$path": "ServerPackages"
-            }
-        },
+
         "StarterPlayer": {
             "$className": "StarterPlayer",
             "StarterPlayerScripts": {
                 "$className": "StarterPlayerScripts",
-                "Client": {
-                    "$path": "src/client"
-                },
+				"$path": "src/StarterPlayer/StarterPlayerScripts",
                 "BubbleChat": {
                     "$className": "LocalScript"
                 },
