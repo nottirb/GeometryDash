@@ -88,7 +88,7 @@ local CharacterController = Knit.CreateController {
 ]=]
 --[=[
     @prop CharacterStateChanged GoodSignal
-    @within Character
+    @within CharacterController
     @tag events
 
     Event that fires when the character changes states.

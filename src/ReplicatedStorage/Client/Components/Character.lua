@@ -59,20 +59,6 @@ Character.Enum.State = {
 }
 
 --[=[
-    @function new
-    @within Character
-
-    @param startPosition Vector3? -- Starting position of the character, defaults to <0,0,0>
-    @param collisionGroup string? -- Collision group of the character, defaults to "Collidables"
-    @param imageProps [State: string]? -- The image properties of the character, give each state its own image. Defaults to default character image properties.
-
-    @return Character -- generated Character object
-
-    Generates a character model at ``startPosition``, and builds a Character object to handle its physics. 
-    You can update the collision group as time goes on by calling ``:SetCollisionGroup(string)``.
-]=]
-
---[=[
     @prop ClassName string
     @within Character
 
@@ -159,6 +145,20 @@ Character.Enum.State = {
     @tag events
 
     Event that fires when the character is destroyed. Is not called with anything.
+]=]
+
+--[=[
+    @function new
+    @within Character
+
+    @param startPosition Vector3? -- Starting position of the character, defaults to <0,0,0>
+    @param collisionGroup string? -- Collision group of the character, defaults to "Collidables"
+    @param imageProps [State: string]? -- The image properties of the character, give each state its own image. Defaults to default character image properties.
+
+    @return Character -- generated Character object
+
+    Generates a character model at ``startPosition``, and builds a Character object to handle its physics. 
+    You can update the collision group as time goes on by calling ``:SetCollisionGroup(string)``.
 ]=]
 function Character.new(startPosition, collisionGroup, imageProps)
     -- Pre-build
@@ -261,6 +261,7 @@ end
     @within Character
 
     @param position Vector3? -- The position that the character is killed at
+    @param finished boolean? -- Whether or not the character died from finishing the level
 
     Kills the Character, eventually calling ``:Destroy()`` on it aswell.
 ]=]
