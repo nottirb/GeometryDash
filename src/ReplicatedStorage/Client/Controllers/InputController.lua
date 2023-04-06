@@ -97,56 +97,52 @@ function InputController:KnitStart()
 
     -- Connect keybinds to input
     local function inputSwitched(input, _gameProcessed, active)
-        -- get input data for faster parsing
-        local inputType = input.UserInputType
-        local isKeyboard = inputType == Enum.UserInputType.Keyboard
-        local isGamepad = inputType == Enum.UserInputType.Gamepad1
-        local keyCode = input.KeyCode
+		-- get input data for faster parsing
+		local inputType = input.UserInputType
+		local isKeyboard = inputType == Enum.UserInputType.Keyboard
+		local isGamepad = inputType == Enum.UserInputType.Gamepad1
+		local keyCode = input.KeyCode
 
-        -- check all keybinds for changes
-        for stateName, keybindData in next, keybinds do
-            if self._states[stateName] ~= active then
-                -- iterate through keybind data to check for changes
-                for _, keybindInput in ipairs(keybindData) do
-                    if (keybindInput == inputType)
-                    or (isKeyboard and keybindInput == keyCode)
-                    or (isGamepad and keybindInput == keyCode) then
-                        -- update state
-                        self._states[stateName] = active
-                        self.StateChanged[stateName]:Fire(active)
+		-- check all keybinds for changes
+		for stateName, keybindData in next, keybinds do
+			if self._states[stateName] == active then return end
 
-                        -- break out of the loop
-                        break
-                    end
-                end
-            end
-        end
+			-- iterate through keybind data to check for changes
+			for _, keybindInput in ipairs(keybindData) do
+				if
+					(keybindInput == inputType)
+					or (isKeyboard and keybindInput == keyCode)
+					or (isGamepad and keybindInput == keyCode)
+				then
+					-- update state
+					self._states[stateName] = active
+					self.StateChanged[stateName]:Fire(active)
 
-        -- recalculate primary input
-        self:_determinePrimaryInput(inputType)
-    end
+					-- break out of the loop
+					break
+				end
+			end
+		end
 
-    -- UserInputService binds
-    UserInputService.InputBegan:Connect(function(input, _gameProcessed)
-        -- keybinds and primary input detection
-        inputSwitched(input, _gameProcessed, true)
-    end)
+		-- recalculate primary input
+		self:_determinePrimaryInput(inputType)
+	end
 
-    UserInputService.InputEnded:Connect(function(input, _gameProcessed)
-        -- keybinds and primary input detection
-        inputSwitched(input, _gameProcessed, false)
-    end)
+	-- UserInputService binds
+	UserInputService.InputBegan:Connect(function(input, _gameProcessed)
+		-- keybinds and primary input detection
+		inputSwitched(input, _gameProcessed, true)
+	end)
 
-    UserInputService.InputChanged:Connect(function(input, _gameProcessed)
-        -- primary input detection
-        self:_determinePrimaryInput(input.UserInputType)
-    end)
+	UserInputService.InputEnded:Connect(function(input, _gameProcessed)
+		-- keybinds and primary input detection
+		inputSwitched(input, _gameProcessed, false)
+	end)
 
-    -- temp
-    print(self.PrimaryInput)
-    self.PrimaryInputChanged:Connect(function(primaryInput, oldPrimaryInput)
-        print("New:", primaryInput, "Old:", oldPrimaryInput)
-    end)
+	UserInputService.InputChanged:Connect(function(input, _gameProcessed)
+		-- primary input detection
+		self:_determinePrimaryInput(input.UserInputType)
+	end)
 end
 
 function InputController:_determinePrimaryInput(inputType)
