@@ -2,3 +2,11 @@
 /*.rbxlx
 /*.rbxlx.lock
 /*.rbxl.lock
+
+# Packages
+Packages
+Packages/*
+Packages/**
+ServerPackages
+ServerPackages/*
+ServerPackages/**

@@ -10,7 +10,7 @@ dependencies = []
 [[package]]
 name = "brittonfischer/geometrydash"
 version = "0.1.0"
-dependencies = [["CameraShaker", "brittonfischer/camerashaker@0.1.0"], ["Janitor", "howmanysmall/janitor@1.13.14"], ["Knit", "sleitnick/knit@1.0.9"], ["Promise", "evaera/promise@3.1.0"], ["ReplicaService", "brittonfischer/replicaservice@0.1.0"], ["Signal", "sleitnick/signal@1.0.1"], ["Spring", "brittonfischer/spring@0.1.0"]]
+dependencies = [["CameraShaker", "brittonfischer/camerashaker@0.1.0"], ["Fusion", "elttob/fusion@0.2.0"], ["FusionExtensions", "nottirb/fusionextensions@0.2.0-rc1"], ["Janitor", "howmanysmall/janitor@1.15.1"], ["Knit", "sleitnick/knit@1.4.7"], ["Promise", "evaera/promise@4.0.0"], ["ReplicaService", "brittonfischer/replicaservice@0.1.0"], ["Signal", "sleitnick/signal@1.0.1"], ["Spring", "brittonfischer/spring@0.1.0"], ["StoryTaskBar", "nottirb/storytaskbar@0.2.0-rc1"], ["Symbol", "sleitnick/symbol@2.0.1"]]
 
 [[package]]
 name = "brittonfischer/profileservice"
@@ -28,34 +28,44 @@ version = "0.1.0"
 dependencies = []
 
 [[package]]
+name = "elttob/fusion"
+version = "0.2.0"
+dependencies = []
+
+[[package]]
 name = "evaera/promise"
-version = "3.1.0"
+version = "4.0.0"
 dependencies = []
 
 [[package]]
 name = "howmanysmall/janitor"
-version = "1.13.14"
+version = "1.15.1"
 dependencies = []
 
 [[package]]
-name = "roblox/testez"
-version = "0.4.1"
+name = "nottirb/fusionextensions"
+version = "0.2.0-rc1"
+dependencies = [["Fusion", "elttob/fusion@0.2.0"], ["Janitor", "howmanysmall/janitor@1.15.1"], ["Oklab", "nottirb/oklab@1.0.0"], ["Spring", "brittonfischer/spring@0.1.0"]]
+
+[[package]]
+name = "nottirb/oklab"
+version = "1.0.0"
 dependencies = []
+
+[[package]]
+name = "nottirb/storytaskbar"
+version = "0.2.0-rc1"
+dependencies = [["Fusion", "elttob/fusion@0.2.0"]]
 
 [[package]]
 name = "sleitnick/comm"
-version = "0.1.2"
-dependencies = [["Option", "sleitnick/option@1.0.2"], ["Promise", "evaera/promise@3.1.0"], ["Signal", "sleitnick/signal@1.0.1"]]
+version = "0.3.1"
+dependencies = [["Option", "sleitnick/option@1.0.2"], ["Promise", "evaera/promise@4.0.0"], ["Signal", "sleitnick/signal@1.0.1"]]
 
 [[package]]
 name = "sleitnick/knit"
-version = "1.0.9"
-dependencies = [["Comm", "sleitnick/comm@0.1.2"], ["Loader", "sleitnick/loader@1.0.2"], ["Promise", "evaera/promise@3.1.0"], ["Signal", "sleitnick/signal@1.0.1"], ["TableUtil", "sleitnick/table-util@1.1.1"]]
-
-[[package]]
-name = "sleitnick/loader"
-version = "1.0.2"
-dependencies = []
+version = "1.4.7"
+dependencies = [["Comm", "sleitnick/comm@0.3.1"], ["Promise", "evaera/promise@4.0.0"]]
 
 [[package]]
 name = "sleitnick/option"
@@ -68,6 +78,6 @@ version = "1.0.1"
 dependencies = []
 
 [[package]]
-name = "sleitnick/table-util"
-version = "1.1.1"
+name = "sleitnick/symbol"
+version = "2.0.1"
 dependencies = []

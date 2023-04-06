@@ -1,1 +1,1 @@
-return require(script.Parent._Index["evaera_promise@3.1.0"]["promise"])
+return require(script.Parent._Index["evaera_promise@4.0.0"]["promise"])
