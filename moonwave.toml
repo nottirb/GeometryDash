@@ -1,15 +1,29 @@
 gitSourceBranch = "main"
 changelog = false
-classOrder = []
 apiCategories = [
     "events"
 ]
 
+[[classOrder]]
+section = "Data"
+classes = ["DataService", "DataController", "Data", "ClientData"]
+
+[[classOrder]]
+section = "Controllers"
+classes = ["CharacterController", "CameraController", "InputController", "InterfaceController", "MapController"]
+
+[[classOrder]]
+section = "Client Modules"
+classes = ["Character", "Effect", "Map"]
+
+[[classOrder]]
+classes = ["SharedModules"]
+
 [docusaurus]
 onBrokenLinks = "throw"
 onBrokenMarkdownLinks = "warn"
-url = "https://brittonfischer.com"
+url = "https://nottirb.com"
 
 [footer]
 style = "dark"
-copyright = "Copyright © 2021 Britton Fischer. Built with Moonwave and Docusaurus"
+copyright = "Copyright © 2023 Britton. Built with Moonwave and Docusaurus"
