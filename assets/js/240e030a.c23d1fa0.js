@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkdocs=self.webpackChunkdocs||[]).push([[683],{63891:e=>{e.exports=JSON.parse('{"sourceUrl":"https://github.com/nottirb/GeometryDash/blob/main","baseUrl":"/GeometryDash/","classOrder":[],"apiCategories":["events"]}')}}]);
